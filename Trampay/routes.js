@@ -113,7 +113,7 @@ const AppRoutes = ({
           )}
         </Stack.Screen>
 
-        <Stack.Screen name="Home">
+        <Stack.Screen name="Homee">
   {(props) => (
     <HomeScreen
       {...props}
