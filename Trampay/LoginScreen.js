@@ -11,11 +11,7 @@ import {
   Platform,
   StyleSheet
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { colors, globalStyles, spacing, fonts } from './styles';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from './DbConfig';
-import { doc, getDoc } from 'firebase/firestore';
 
 const LoginScreen = ({ navigation, onLogin }) => {
   // Estados para os campos do formulário
@@ -65,36 +61,43 @@ const LoginScreen = ({ navigation, onLogin }) => {
   // Função para fazer login
   const handleLogin = async () => {
     if (!validateForm()) return;
+
     setIsLoading(true);
-  
+    
     try {
-      // Faz login com Firebase
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-  
-      const user = userCredential.user;
-  
-      // Busca dados adicionais no Firestore
-      const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
-  
-      if (onLogin) {
-        onLogin({
-          uid: user.uid,
-          email: user.email,
-          ...userData,
-          isAuthenticated: true
+      // Simula login (será integrado com Firebase depois)
+      // Credenciais de exemplo para demonstração
+      const validEmail = 'demo@trampay.com';
+      const validPassword = '123456';
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (formData.email === validEmail && formData.password === validPassword) {
+        // Login bem-sucedido
+        if (onLogin) {
+          onLogin({
+            email: formData.email,
+            isAuthenticated: true
+          });
+        }
+        
+        // Navega para Home passando dados do usuário
+        navigation.navigate('Home', { 
+          user: {
+            email: formData.email,
+            name: formData.email.split('@')[0],
+            isAuthenticated: true
+          }
         });
+      } else {
+        // Credenciais inválidas
+        Alert.alert(
+          'Erro',
+          'Email ou senha incorretos.\n\nPara demonstração use:\nEmail: demo@trampay.com\nSenha: 123456'
+        );
       }
-  
-      navigation.navigate('Home', { user: { ...userData, email: user.email } });
-  
     } catch (error) {
-      console.error("Erro no login:", error);
-      Alert.alert('Erro', 'Email ou senha incorretos ou usuário inexistente.');
+      Alert.alert('Erro', 'Erro ao fazer login. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -113,11 +116,6 @@ const LoginScreen = ({ navigation, onLogin }) => {
           {/* Logo Section */}
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <View style={styles.logoInner}>
-                  <MaterialIcons name="account-balance-wallet" size={32} color={colors.primary} />
-                </View>
-              </View>
               <Text style={styles.appTitle}>Trampay</Text>
               <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
               <Text style={styles.subWelcomeText}>Entre na sua conta para continuar</Text>
@@ -231,47 +229,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
 
-  logoCircle: {
-    width: 120,
-    height: 120,
-    backgroundColor: colors.primary,
-    borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 15,
-    borderWidth: 4,
-    borderColor: '#fff3cd',
-  },
-
-  logoInner: {
-    width: 80,
-    height: 80,
-    backgroundColor: colors.white,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-
-  logoIcon: {
-    fontSize: 32,
-    color: colors.primary,
-  },
 
   appTitle: {
     fontSize: 48,

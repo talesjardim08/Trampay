@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 
+// Importa sistema de roteamento
 import AppRoutes from './routes';
 import SplashScreenComponent from './SplashScreen';
 

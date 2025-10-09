@@ -11,12 +11,7 @@ import {
   Platform,
   StyleSheet
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { colors, globalStyles, spacing, fonts } from './styles';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './DbConfig';
-
 
 const CreateAccountScreen = ({ navigation, onCreateAccount }) => {
   // Estados para os campos do formulário
@@ -76,42 +71,30 @@ const CreateAccountScreen = ({ navigation, onCreateAccount }) => {
   // Função para criar conta
   const handleCreateAccount = async () => {
     if (!validateForm()) return;
+
     setIsLoading(true);
-  
+    
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-  
-      const user = userCredential.user;
-  
-      // Salva dados no Firestore
-      await setDoc(doc(db, "usuarios", user.uid), {
-        nome: formData.name,
-        email: formData.email,
-        senha: formData.password, 
-        dataCadastro: serverTimestamp(),
-        idade: 0,
-        cpf: "",
-        fotoPerfilURL: "",
-        planoAssinatura: false,
-        planoGratuito: true,
-        saldoAtual: 0,
-        tipoConta: "gratuita"
-      });
-  
-      if (onCreateAccount) onCreateAccount(formData);
-  
+      // Simula criação de conta (será integrado com Firebase depois)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Chama função de criação de conta passada como prop
+      if (onCreateAccount) {
+        onCreateAccount(formData);
+      }
+      
       Alert.alert(
-        "Sucesso",
-        "Conta criada com sucesso!",
-        [{ text: "OK", onPress: () => navigation.navigate('Login') }]
+        'Sucesso!',
+        'Conta criada com sucesso!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login')
+          }
+        ]
       );
     } catch (error) {
-      console.error("Erro ao criar conta:", error);
-      Alert.alert("Erro", "Não foi possível criar a conta. Tente novamente.");
+      Alert.alert('Erro', 'Erro ao criar conta. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -130,11 +113,6 @@ const CreateAccountScreen = ({ navigation, onCreateAccount }) => {
           {/* Logo Section */}
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <View style={styles.logoInner}>
-                  <MaterialIcons name="account-balance-wallet" size={32} color={colors.primary} />
-                </View>
-              </View>
               <Text style={styles.appTitle}>Trampay</Text>
               <Text style={styles.welcomeText}>Crie sua conta</Text>
               <Text style={styles.subWelcomeText}>Junte-se à nossa comunidade financeira</Text>
@@ -254,42 +232,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
 
-  logoCircle: {
-    width: 120,
-    height: 120,
-    backgroundColor: colors.primary,
-    borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 15,
-    borderWidth: 4,
-    borderColor: '#fff3cd',
-  },
-
-  logoInner: {
-    width: 80,
-    height: 80,
-    backgroundColor: colors.white,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
 
   appTitle: {
     fontSize: 48,
