@@ -1,0 +1,6 @@
+@TrampayBackend_HostAddress = http://localhost:5125
+
+GET {{TrampayBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
