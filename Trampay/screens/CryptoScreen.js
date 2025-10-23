@@ -1,242 +1,245 @@
-// Tela de Índices de Criptomoedas - Trampay
-import React, { useState, useEffect } from 'react';
+// CryptoScreen.js
+// Tela de Índices de Criptomoedas - Visual igual ao CurrencyScreen (paleta TramPay)
+// Mantém funcionalidades: fetch (CoinMarketCap fallback), favoritos (SecureStore), watchlist toggle, tabs, pull-to-refresh.
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   SafeAreaView,
   TextInput,
   Alert,
-  RefreshControl,
-  Dimensions
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
-import { colors, fonts, spacing } from '../styles';
 
-const { width } = Dimensions.get('window');
+const colors = {
+  background: '#F7F7F9',
+  card: '#FFFFFF',
+  primary: '#FFD84D',
+  primaryDark: '#E6BA2F',
+  darkBlue: '#0F1724',
+  text: '#24313A',
+  textLight: '#7B8790',
+  success: '#0BB066',
+  danger: '#E25555',
+  warning: '#F5B041',
+  white: '#FFFFFF',
+};
 
-const CryptoScreen = ({ navigation, route }) => {
+const TRAMPAY_BLUE = colors.primary;
+const TRAMPAY_YELLOW = colors.primaryDark;
+const BACKGROUND_WHITE = colors.card;
+const LIGHT_GREY = colors.background;
+const MUTED = colors.textLight;
+
+const FAVORITES_STORAGE_KEY = 'crypto_favorites';
+const WATCHLIST_STORAGE_KEY = 'crypto_watchlist';
+
+const mockCryptoData = [
+  {
+    id: 'bitcoin',
+    symbol: 'BTC',
+    name: 'Bitcoin',
+    icon: '₿',
+    price: 324500.0,
+    change_24h: 2.15,
+    market_cap: 6345000000000,
+    volume_24h: 28500000000,
+    rank: 1,
+  },
+  {
+    id: 'ethereum',
+    symbol: 'ETH',
+    name: 'Ethereum',
+    icon: 'Ξ',
+    price: 21450.0,
+    change_24h: -1.23,
+    market_cap: 2580000000000,
+    volume_24h: 15200000000,
+    rank: 2,
+  },
+  {
+    id: 'tether',
+    symbol: 'USDT',
+    name: 'Tether',
+    icon: '₮',
+    price: 5.64,
+    change_24h: 0.05,
+    market_cap: 83000000000,
+    volume_24h: 32100000000,
+    rank: 3,
+  },
+  {
+    id: 'binancecoin',
+    symbol: 'BNB',
+    name: 'BNB',
+    icon: 'B',
+    price: 1250.0,
+    change_24h: 3.45,
+    market_cap: 192000000000,
+    volume_24h: 1800000000,
+    rank: 4,
+  },
+  {
+    id: 'cardano',
+    symbol: 'ADA',
+    name: 'Cardano',
+    icon: '₳',
+    price: 2.15,
+    change_24h: -0.87,
+    market_cap: 76000000000,
+    volume_24h: 1200000000,
+    rank: 5,
+  },
+];
+
+const CryptoScreen = ({ navigation }) => {
   const [cryptos, setCryptos] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('market'); // 'market', 'favorites', 'portfolio'
+  const [selectedTab, setSelectedTab] = useState('market'); // 'market' | 'favorites' | 'watchlist'
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('market_cap'); // 'market_cap', 'price', 'change'
-  const [portfolioValue, setPortfolioValue] = useState(0);
+  const [sortBy, setSortBy] = useState('market_cap'); // 'market_cap' | 'price' | 'change'
 
-  const FAVORITES_STORAGE_KEY = 'crypto_favorites';
-  const WATCHLIST_STORAGE_KEY = 'crypto_watchlist';
-  const PORTFOLIO_STORAGE_KEY = 'crypto_portfolio';
-
-  // Mock data para demonstração (substituir por API real)
-  const mockCryptoData = [
-    {
-      id: 'bitcoin',
-      symbol: 'BTC',
-      name: 'Bitcoin',
-      icon: '₿',
-      price: 324500.00,
-      change_24h: 2.15,
-      market_cap: 6345000000000,
-      volume_24h: 28500000000,
-      rank: 1
-    },
-    {
-      id: 'ethereum',
-      symbol: 'ETH',
-      name: 'Ethereum',
-      icon: 'Ξ',
-      price: 21450.00,
-      change_24h: -1.23,
-      market_cap: 2580000000000,
-      volume_24h: 15200000000,
-      rank: 2
-    },
-    {
-      id: 'tether',
-      symbol: 'USDT',
-      name: 'Tether',
-      icon: '₮',
-      price: 5.64,
-      change_24h: 0.05,
-      market_cap: 83000000000,
-      volume_24h: 32100000000,
-      rank: 3
-    },
-    {
-      id: 'binancecoin',
-      symbol: 'BNB',
-      name: 'BNB',
-      icon: 'B',
-      price: 1250.00,
-      change_24h: 3.45,
-      market_cap: 192000000000,
-      volume_24h: 1800000000,
-      rank: 4
-    },
-    {
-      id: 'cardano',
-      symbol: 'ADA',
-      name: 'Cardano',
-      icon: '₳',
-      price: 2.15,
-      change_24h: -0.87,
-      market_cap: 76000000000,
-      volume_24h: 1200000000,
-      rank: 5
-    }
-  ];
-
-  // Buscar dados de criptomoedas 
-  const fetchCryptoData = async () => {
+  // --- Fetch crypto data (CoinMarketCap if key available, else mock) ---
+  const fetchCryptoData = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Tentar usar API real se disponível
       const coinMarketCapKey = Constants.expoConfig?.extra?.COINMARKETCAP_API_KEY;
-      
       if (coinMarketCapKey) {
         try {
-          const response = await fetch('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=10&convert=BRL', {
-            headers: {
-              'X-CMC_PRO_API_KEY': coinMarketCapKey,
-              'Accept': 'application/json',
+          const resp = await fetch(
+            'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=BRL',
+            {
+              headers: {
+                'X-CMC_PRO_API_KEY': coinMarketCapKey,
+                Accept: 'application/json',
+              },
             }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            const cryptoData = data.data.map(crypto => ({
-              id: crypto.id.toString(),
-              symbol: crypto.symbol,
-              name: crypto.name,
-              icon: crypto.symbol.charAt(0),
-              price: crypto.quote.BRL.price,
-              change_24h: crypto.quote.BRL.percent_change_24h,
-              market_cap: crypto.quote.BRL.market_cap,
-              volume_24h: crypto.quote.BRL.volume_24h,
-              rank: crypto.cmc_rank
+          );
+          if (resp.ok) {
+            const json = await resp.json();
+            const mapped = json.data.map((c) => ({
+              id: c.id.toString(),
+              symbol: c.symbol,
+              name: c.name,
+              icon: c.symbol.charAt(0),
+              price: c.quote.BRL.price,
+              change_24h: c.quote.BRL.percent_change_24h,
+              market_cap: c.quote.BRL.market_cap,
+              volume_24h: c.quote.BRL.volume_24h,
+              rank: c.cmc_rank,
             }));
-            
-            setCryptos(cryptoData);
+            setCryptos(mapped);
             setLoading(false);
             setRefreshing(false);
             return;
           }
-        } catch (apiError) {
-          console.log('API não disponível, usando dados mock:', apiError);
+        } catch (err) {
+          console.log('CoinMarketCap fetch failed, using mock:', err);
         }
       }
-      
-      // Fallback para dados mock se API não estiver disponível
+
+      // fallback: mock
       setTimeout(() => {
         setCryptos(mockCryptoData);
         setLoading(false);
         setRefreshing(false);
-      }, 1000);
-      
+      }, 700);
     } catch (error) {
       console.error('Erro ao buscar dados de cripto:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados das criptomoedas');
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  // Carregar favoritos e watchlist
-  const loadUserData = async () => {
+  // --- Load favorites & watchlist from SecureStore ---
+  const loadUserData = useCallback(async () => {
     try {
-      const storedFavorites = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
-      if (storedFavorites) {
-        setFavorites(JSON.parse(storedFavorites));
-      }
+      const storedFav = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
+      if (storedFav) setFavorites(JSON.parse(storedFav));
 
-      const storedWatchlist = await SecureStore.getItemAsync(WATCHLIST_STORAGE_KEY);
-      if (storedWatchlist) {
-        setWatchlist(JSON.parse(storedWatchlist));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
+      const storedWatch = await SecureStore.getItemAsync(WATCHLIST_STORAGE_KEY);
+      if (storedWatch) setWatchlist(JSON.parse(storedWatch));
+    } catch (err) {
+      console.error('Erro ao carregar dados do usuário:', err);
     }
-  };
-
-  // Toggle favorito
-  const toggleFavorite = async (cryptoId) => {
-    const newFavorites = favorites.includes(cryptoId)
-      ? favorites.filter(fav => fav !== cryptoId)
-      : [...favorites, cryptoId];
-    
-    try {
-      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
-      setFavorites(newFavorites);
-    } catch (error) {
-      console.error('Erro ao salvar favoritos:', error);
-    }
-  };
-
-  // Adicionar à watchlist
-  const addToWatchlist = async (crypto) => {
-    const isInWatchlist = watchlist.some(item => item.id === crypto.id);
-    
-    if (isInWatchlist) {
-      Alert.alert('Info', 'Esta criptomoeda já está na sua watchlist');
-      return;
-    }
-
-    const newWatchlist = [...watchlist, {
-      ...crypto,
-      added_at: new Date().toISOString()
-    }];
-
-    try {
-      await SecureStore.setItemAsync(WATCHLIST_STORAGE_KEY, JSON.stringify(newWatchlist));
-      setWatchlist(newWatchlist);
-      Alert.alert('Sucesso', 'Adicionado à watchlist!');
-    } catch (error) {
-      console.error('Erro ao salvar watchlist:', error);
-    }
-  };
-
-  // Formatar valores
-  const formatPrice = (price) => {
-    return `R$ ${price.toLocaleString('pt-BR', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    })}`;
-  };
-
-  const formatMarketCap = (marketCap) => {
-    if (marketCap >= 1e12) {
-      return `R$ ${(marketCap / 1e12).toFixed(2)}T`;
-    } else if (marketCap >= 1e9) {
-      return `R$ ${(marketCap / 1e9).toFixed(2)}B`;
-    } else if (marketCap >= 1e6) {
-      return `R$ ${(marketCap / 1e6).toFixed(2)}M`;
-    }
-    return `R$ ${marketCap.toFixed(0)}`;
-  };
+  }, []);
 
   useEffect(() => {
     fetchCryptoData();
     loadUserData();
-  }, []);
+  }, [fetchCryptoData, loadUserData]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchCryptoData();
   };
 
-  // Filtrar e ordenar criptomoedas
+  // --- Toggle favorite ---
+  const toggleFavorite = async (cryptoId) => {
+    const newFav = favorites.includes(cryptoId)
+      ? favorites.filter((f) => f !== cryptoId)
+      : [...favorites, cryptoId];
+    try {
+      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFav));
+      setFavorites(newFav);
+    } catch (err) {
+      console.error('Erro ao salvar favoritos:', err);
+    }
+  };
+
+  // --- Toggle watchlist (adicionar/remover) ---
+  const toggleWatchlist = async (crypto) => {
+    const exists = watchlist.some((w) => w.id === crypto.id);
+    let newWatch;
+    if (exists) {
+      newWatch = watchlist.filter((w) => w.id !== crypto.id);
+    } else {
+      newWatch = [...watchlist, { ...crypto, added_at: new Date().toISOString() }];
+    }
+    try {
+      await SecureStore.setItemAsync(WATCHLIST_STORAGE_KEY, JSON.stringify(newWatch));
+      setWatchlist(newWatch);
+      if (exists) {
+        // remover feedback
+        // opcional: Alert.alert('Removido', `${crypto.name} removida da watchlist`);
+      } else {
+        // opcional: Alert.alert('Adicionado', `${crypto.name} adicionada à watchlist`);
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar watchlist:', err);
+    }
+  };
+
+  // --- Formatting helpers ---
+  const formatPrice = (price) =>
+    `R$ ${Number(price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const formatMarketCap = (v) => {
+    if (v === undefined || v === null) return 'R$ —';
+    if (v >= 1e12) return `R$ ${(v / 1e12).toFixed(2)}T`;
+    if (v >= 1e9) return `R$ ${(v / 1e9).toFixed(2)}B`;
+    if (v >= 1e6) return `R$ ${(v / 1e6).toFixed(2)}M`;
+    return `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+  };
+
+  // --- Filter & sort ---
   const filteredCryptos = cryptos
-    .filter(crypto =>
-      crypto.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      crypto.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.symbol.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
       switch (sortBy) {
@@ -250,463 +253,416 @@ const CryptoScreen = ({ navigation, route }) => {
       }
     });
 
-  const favoriteCryptos = cryptos.filter(crypto =>
-    favorites.includes(crypto.id)
-  );
+  const favoriteCryptos = cryptos.filter((c) => favorites.includes(c.id));
 
-  const renderCryptoItem = (crypto, showAddToWatchlist = true) => (
-    <TouchableOpacity
-      key={crypto.id}
-      style={styles.cryptoItem}
-      onPress={() => {
-        // Navegar para detalhes da criptomoeda
-        Alert.alert('Em breve', 'Detalhes da criptomoeda serão implementados');
-      }}
-    >
-      <View style={styles.cryptoHeader}>
-        <View style={styles.cryptoInfo}>
-          <Text style={styles.cryptoIcon}>{crypto.icon}</Text>
-          <View style={styles.cryptoDetails}>
-            <Text style={styles.cryptoName}>{crypto.name}</Text>
-            <Text style={styles.cryptoSymbol}>{crypto.symbol}</Text>
+  // --- Render individual crypto item (updated card) ---
+  const renderCryptoItem = ({ item }) => {
+    const changePositive = item.change_24h >= 0;
+    const inWatchlist = watchlist.some((w) => w.id === item.id);
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.95}
+        style={[
+          styles.cryptoItem,
+          { borderLeftColor: changePositive ? '#DFF6E8' : '#FFECEC', borderLeftWidth: 4 },
+        ]}
+        onPress={() => Alert.alert('Em breve', 'Detalhes da criptomoeda serão implementados')}
+      >
+        {/* Top row: name + rank+price */}
+        <View style={styles.cryptoTop}>
+          <View style={styles.leftInfo}>
+            <View style={styles.rankAndIcon}>
+              <View style={styles.rankCircle}>
+                <Text style={styles.rankNumber}>#{item.rank}</Text>
+              </View>
+              <View style={styles.cryptoIconWrap}>
+                <Text style={styles.cryptoIcon}>{item.icon}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginLeft: 10 }}>
+              <Text style={styles.code}>{item.name}</Text>
+              <Text style={styles.name}>{item.symbol}</Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.cryptoActions}>
-          {showAddToWatchlist && (
-            <TouchableOpacity
-              onPress={() => addToWatchlist(crypto)}
-              style={styles.actionButton}
+
+          <View style={styles.rightActions}>
+            <View style={styles.priceRow}>
+              <Text style={styles.rateText}>{formatPrice(item.price)}</Text>
+            </View>
+
+            <View
+              style={[
+                styles.changeBadge,
+                { backgroundColor: changePositive ? '#E6FBEE' : '#FFEDED' },
+              ]}
             >
-              <MaterialIcons name="add-alert" size={20} color={colors.textLight} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() => toggleFavorite(crypto.id)}
-            style={styles.actionButton}
-          >
-            <MaterialIcons
-              name={favorites.includes(crypto.id) ? 'favorite' : 'favorite-outline'}
-              size={20}
-              color={favorites.includes(crypto.id) ? colors.danger : colors.textLight}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.cryptoStats}>
-        <View style={styles.cryptoPrice}>
-          <Text style={styles.priceValue}>{formatPrice(crypto.price)}</Text>
-          <View style={[styles.priceChange, {
-            backgroundColor: crypto.change_24h >= 0 ? colors.success : colors.danger
-          }]}>
-            <MaterialIcons
-              name={crypto.change_24h >= 0 ? 'trending-up' : 'trending-down'}
-              size={16}
-              color={colors.white}
-            />
-            <Text style={styles.priceChangeText}>
-              {crypto.change_24h.toFixed(2)}%
-            </Text>
+              <MaterialIcons
+                name={changePositive ? 'trending-up' : 'trending-down'}
+                size={14}
+                color={changePositive ? TRAMPAY_BLUE : '#C62828'}
+              />
+              <Text
+                style={[
+                  styles.changeText,
+                  { color: changePositive ? '#0B6A36' : '#C62828' },
+                ]}
+              >
+                {item.change_24h !== undefined ? `${item.change_24h.toFixed(2)}%` : '—'}
+              </Text>
+            </View>
           </View>
         </View>
-        
-        <View style={styles.cryptoMetrics}>
-          <Text style={styles.metricLabel}>Cap. Mercado: {formatMarketCap(crypto.market_cap)}</Text>
-          <Text style={styles.metricLabel}>Volume 24h: {formatMarketCap(crypto.volume_24h)}</Text>
-        </View>
-      </View>
 
-      <View style={styles.rankBadge}>
-        <Text style={styles.rankText}>#{crypto.rank}</Text>
-      </View>
-    </TouchableOpacity>
+        {/* Bottom row: metrics + actions */}
+        <View style={styles.cryptoBottom}>
+          <View style={styles.miniInfo}>
+            <Text style={styles.smallLabel}>Cap. Mercado</Text>
+            <Text style={styles.smallValue}>{formatMarketCap(item.market_cap)}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.miniInfo}>
+            <Text style={styles.smallLabel}>Volume 24h</Text>
+            <Text style={styles.smallValue}>{formatMarketCap(item.volume_24h)}</Text>
+          </View>
+
+          <View style={styles.rightButtons}>
+            <TouchableOpacity
+              style={[styles.iconBtn, inWatchlist ? styles.iconBtnActive : null]}
+              onPress={() => toggleWatchlist(item)}
+            >
+              <MaterialIcons
+                name={inWatchlist ? 'notifications-active' : 'notifications-none'}
+                size={18}
+                color={inWatchlist ? TRAMPAY_YELLOW : MUTED}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.heartWrap,
+                favorites.includes(item.id) ? styles.heartActive : styles.heartInactive,
+              ]}
+              onPress={() => toggleFavorite(item.id)}
+            >
+              <MaterialIcons
+                name={favorites.includes(item.id) ? 'favorite' : 'favorite-outline'}
+                size={16}
+                color={favorites.includes(item.id) ? TRAMPAY_YELLOW : MUTED}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const ListEmpty = ({ type }) => (
+    <View style={styles.emptyFav}>
+      <MaterialIcons name={type === 'fav' ? 'favorite-outline' : 'visibility'} size={56} color={MUTED} />
+      <Text style={styles.emptyFavText}>
+        {type === 'fav' ? 'Nenhuma favorita ainda' : 'Lista vazia'}
+      </Text>
+      <Text style={styles.emptyFavSub}>
+        {type === 'fav' ? 'Toque no ❤️ para adicionar às suas favoritas' : 'Use o sino 🔔 para adicionar à watchlist'}
+      </Text>
+    </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.screen}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={colors.primaryDark} />
+        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={22} color={TRAMPAY_BLUE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Criptomoedas</Text>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={onRefresh}
-        >
-          <MaterialIcons name="refresh" size={24} color={colors.primaryDark} />
-        </TouchableOpacity>
-      </View>
 
-      {/* Market Overview */}
-      <View style={styles.marketOverview}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.overviewCard}>
-            <Text style={styles.overviewLabel}>Market Cap Total</Text>
-            <Text style={styles.overviewValue}>R$ 12,5T</Text>
-            <Text style={styles.overviewChange}>+2.3%</Text>
-          </View>
-          <View style={styles.overviewCard}>
-            <Text style={styles.overviewLabel}>Volume 24h</Text>
-            <Text style={styles.overviewValue}>R$ 890B</Text>
-            <Text style={styles.overviewChange}>+5.1%</Text>
-          </View>
-          <View style={styles.overviewCard}>
-            <Text style={styles.overviewLabel}>Dominância BTC</Text>
-            <Text style={styles.overviewValue}>42.5%</Text>
-            <Text style={styles.overviewChange}>+0.8%</Text>
-          </View>
-        </ScrollView>
+        <Text style={styles.headerTitle}>Criptomoedas</Text>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
+          <MaterialIcons name="refresh" size={22} color={TRAMPAY_BLUE} />
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
+      <View style={styles.tabsRow}>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'market' && styles.activeTab]}
+          style={[styles.tabBtn, selectedTab === 'market' && styles.tabActive]}
           onPress={() => setSelectedTab('market')}
+          activeOpacity={0.85}
         >
-          <Text style={[styles.tabText, selectedTab === 'market' && styles.activeTabText]}>
-            Mercado
-          </Text>
+          <Text style={[styles.tabText, selectedTab === 'market' && styles.tabTextActive]}>Mercado</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'favorites' && styles.activeTab]}
+          style={[styles.tabBtn, selectedTab === 'favorites' && styles.tabActive]}
           onPress={() => setSelectedTab('favorites')}
+          activeOpacity={0.85}
         >
-          <Text style={[styles.tabText, selectedTab === 'favorites' && styles.activeTabText]}>
-            Favoritas
-          </Text>
+          <Text style={[styles.tabText, selectedTab === 'favorites' && styles.tabTextActive]}>Favoritas</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'portfolio' && styles.activeTab]}
-          onPress={() => setSelectedTab('portfolio')}
+          style={[styles.tabBtn, selectedTab === 'watchlist' && styles.tabActive]}
+          onPress={() => setSelectedTab('watchlist')}
+          activeOpacity={0.85}
         >
-          <Text style={[styles.tabText, selectedTab === 'portfolio' && styles.activeTabText]}>
-            Watchlist
-          </Text>
+          <Text style={[styles.tabText, selectedTab === 'watchlist' && styles.tabTextActive]}>Watchlist</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {selectedTab === 'market' && (
-          <>
-            {/* Search and Sort */}
-            <View style={styles.searchSortContainer}>
-              <View style={styles.searchContainer}>
-                <MaterialIcons name="search" size={20} color={colors.textLight} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar criptomoeda..."
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
-              <TouchableOpacity
-                style={styles.sortButton}
-                onPress={() => {
-                  const sorts = ['market_cap', 'price', 'change'];
-                  const currentIndex = sorts.indexOf(sortBy);
-                  const nextIndex = (currentIndex + 1) % sorts.length;
-                  setSortBy(sorts[nextIndex]);
-                }}
-              >
-                <MaterialIcons name="sort" size={20} color={colors.primaryDark} />
-              </TouchableOpacity>
-            </View>
+      {/* Content */}
+      <View style={styles.content}>
+        <View style={styles.searchWrap}>
+          <MaterialIcons name="search" size={20} color={MUTED} />
+          <TextInput
+            placeholder="Buscar criptomoeda..."
+            placeholderTextColor={MUTED}
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity
+            style={{ marginLeft: 8, padding: 6 }}
+            onPress={() => {
+              const sorts = ['market_cap', 'price', 'change'];
+              const idx = sorts.indexOf(sortBy);
+              setSortBy(sorts[(idx + 1) % sorts.length]);
+            }}
+          >
+            <MaterialIcons name="sort" size={20} color={TRAMPAY_YELLOW} />
+          </TouchableOpacity>
+        </View>
 
-            {/* Crypto List */}
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Carregando dados...</Text>
-              </View>
-            ) : (
-              <View style={styles.cryptoList}>
-                {filteredCryptos.map(crypto => renderCryptoItem(crypto))}
-              </View>
-            )}
-          </>
+        <View style={styles.marketOverview}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewLabel}>Market Cap Total</Text>
+              <Text style={styles.overviewValue}>R$ 12,5T</Text>
+              <Text style={styles.overviewChange}>+2.3%</Text>
+            </View>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewLabel}>Volume 24h</Text>
+              <Text style={styles.overviewValue}>R$ 890B</Text>
+              <Text style={styles.overviewChange}>+5.1%</Text>
+            </View>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewLabel}>Dominância BTC</Text>
+              <Text style={styles.overviewValue}>42.5%</Text>
+              <Text style={styles.overviewChange}>+0.8%</Text>
+            </View>
+          </ScrollView>
+        </View>
+
+        {selectedTab === 'market' && (
+          <FlatList
+            data={filteredCryptos}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderCryptoItem}
+            contentContainerStyle={{ paddingBottom: 48, paddingTop: 8 }}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={<ListEmpty type="market" />}
+            initialNumToRender={12}
+          />
         )}
 
         {selectedTab === 'favorites' && (
-          <View style={styles.favoritesContainer}>
-            {favoriteCryptos.length > 0 ? (
-              <View style={styles.cryptoList}>
-                {favoriteCryptos.map(crypto => renderCryptoItem(crypto, false))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="favorite-outline" size={48} color={colors.textLight} />
-                <Text style={styles.emptyStateText}>Nenhuma favorita ainda</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Toque no ❤️ para adicionar às suas favoritas
-                </Text>
-              </View>
-            )}
-          </View>
+          <FlatList
+            data={favoriteCryptos}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderCryptoItem}
+            contentContainerStyle={{ paddingBottom: 48, paddingTop: 8 }}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={<ListEmpty type="fav" />}
+            initialNumToRender={8}
+          />
         )}
 
-        {selectedTab === 'portfolio' && (
-          <View style={styles.portfolioContainer}>
-            {watchlist.length > 0 ? (
-              <View style={styles.cryptoList}>
-                {watchlist.map(crypto => renderCryptoItem(crypto, false))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="visibility" size={48} color={colors.textLight} />
-                <Text style={styles.emptyStateText}>Watchlist vazia</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Use o botão 🔔 para adicionar criptomoedas à sua watchlist
-                </Text>
-              </View>
-            )}
-          </View>
+        {selectedTab === 'watchlist' && (
+          <FlatList
+            data={watchlist}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderCryptoItem}
+            contentContainerStyle={{ paddingBottom: 48, paddingTop: 8 }}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={<ListEmpty type="watch" />}
+            initialNumToRender={8}
+          />
         )}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: LIGHT_GREY,
+    paddingTop: Platform.OS === 'android' ? 8 : 0,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.medium,
-    paddingVertical: spacing.medium,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: BACKGROUND_WHITE,
+    borderBottomWidth: 0,
+    elevation: 2,
   },
-  backButton: {
-    padding: spacing.small,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: {
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: colors.text, marginTop: 2 },
+  refreshBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+
+  tabsRow: {
+    flexDirection: 'row',
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: BACKGROUND_WHITE,
+  },
+  tabBtn: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primaryDark,
-    textAlign: 'center',
+    marginHorizontal: 6,
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  refreshButton: {
-    padding: spacing.small,
+  tabActive: {
+    backgroundColor: TRAMPAY_BLUE,
+    elevation: 2,
+    shadowColor: TRAMPAY_BLUE,
   },
+  tabText: { color: TRAMPAY_BLUE, fontWeight: '700' },
+  tabTextActive: { color: BACKGROUND_WHITE },
+
+  content: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: BACKGROUND_WHITE,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEF3FB',
+  },
+  searchInput: { marginLeft: 8, fontSize: 14, color: '#273444', flex: 1 },
+
   marketOverview: {
-    backgroundColor: colors.white,
-    paddingVertical: spacing.medium,
+    backgroundColor: BACKGROUND_WHITE,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
   overviewCard: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: spacing.medium,
-    marginHorizontal: spacing.small,
+    backgroundColor: LIGHT_GREY,
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 8,
     minWidth: 120,
     alignItems: 'center',
   },
   overviewLabel: {
     fontSize: 12,
-    color: colors.textLight,
-    marginBottom: 4,
+    color: MUTED,
+    marginBottom: 6,
   },
   overviewValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: colors.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   overviewChange: {
     fontSize: 12,
     color: colors.success,
   },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.medium,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: spacing.medium,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    color: colors.textLight,
-  },
-  activeTabText: {
-    color: colors.primary,
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-    padding: spacing.medium,
-  },
-  searchSortContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.medium,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: spacing.small,
-    marginRight: spacing.small,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: spacing.small,
-    fontSize: 14,
-    color: colors.text,
-  },
-  sortButton: {
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: spacing.small,
-  },
-  cryptoList: {
-    gap: spacing.small,
-  },
+
+  /* Crypto Item styles (mimic currency card but prettier) */
   cryptoItem: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: spacing.medium,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: BACKGROUND_WHITE,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#0A2340',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 3,
     position: 'relative',
   },
-  cryptoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.small,
-  },
-  cryptoInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  cryptoIcon: {
-    fontSize: 32,
-    marginRight: spacing.medium,
-  },
-  cryptoDetails: {
-    flex: 1,
-  },
-  cryptoName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  cryptoSymbol: {
-    fontSize: 12,
-    color: colors.textLight,
-  },
-  cryptoActions: {
-    flexDirection: 'row',
-  },
-  actionButton: {
-    padding: spacing.small,
-    marginLeft: spacing.small,
-  },
-  cryptoStats: {
-    marginBottom: spacing.small,
-  },
-  cryptoPrice: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.small,
-  },
-  priceValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  priceChange: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.small,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priceChangeText: {
-    fontSize: 12,
-    color: colors.white,
-    marginLeft: 4,
-  },
-  cryptoMetrics: {
-    gap: 2,
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: colors.textLight,
-  },
-  rankBadge: {
-    position: 'absolute',
-    top: spacing.small,
-    right: spacing.small,
-    backgroundColor: colors.primaryDark,
+
+  cryptoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  leftInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  rankAndIcon: { flexDirection: 'row', alignItems: 'center' },
+
+  rankCircle: {
+    width: 36,
+    height: 36,
     borderRadius: 10,
-    paddingHorizontal: spacing.small,
-    paddingVertical: 2,
-  },
-  rankText: {
-    fontSize: 10,
-    color: colors.white,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    padding: spacing.large,
+    backgroundColor: TRAMPAY_YELLOW,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textLight,
-  },
-  emptyState: {
+  rankNumber: { fontSize: 12, fontWeight: '800', color: colors.white },
+
+  cryptoIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingVertical: spacing.large * 2,
+    justifyContent: 'center',
+    backgroundColor: '#FBF6E6',
   },
-  emptyStateText: {
-    fontSize: 18,
-    color: colors.textLight,
-    marginTop: spacing.medium,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginTop: spacing.small,
-    textAlign: 'center',
-  },
-  favoritesContainer: {
-    flex: 1,
-  },
-  portfolioContainer: {
-    flex: 1,
-  },
+  cryptoIcon: { fontSize: 20, color: colors.darkBlue },
+  code: { fontSize: 15, fontWeight: '700', color: colors.darkBlue },
+  name: { fontSize: 12, color: MUTED },
+
+  rightActions: { alignItems: 'flex-end' },
+  priceRow: { flexDirection: 'row', alignItems: 'center' },
+  rateText: { fontSize: 16, fontWeight: '800', color: colors.darkBlue },
+  changeBadge: { marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
+  changeText: { marginLeft: 6, fontSize: 12, fontWeight: '700' },
+
+  cryptoBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 12, justifyContent: 'space-between' },
+  miniInfo: { alignItems: 'flex-start' },
+  smallLabel: { fontSize: 11, color: MUTED },
+  smallValue: { fontSize: 12, fontWeight: '700', color: colors.darkBlue },
+  divider: { width: 1, height: 36, backgroundColor: '#EEF3FB', marginHorizontal: 12 },
+
+  rightButtons: { flexDirection: 'row', alignItems: 'center' },
+  iconBtn: { padding: 8, borderRadius: 10, marginRight: 8, backgroundColor: '#F5F7FA' },
+  iconBtnActive: { backgroundColor: '#FFF7E6' },
+
+  heartWrap: { padding: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  heartActive: { backgroundColor: '#FFF7E6' },
+  heartInactive: { backgroundColor: '#F5F7FA' },
+
+  rankBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: TRAMPAY_YELLOW, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  rankText: { fontSize: 10, color: colors.white, fontWeight: '700' },
+
+  loadingBox: { padding: 40, alignItems: 'center' },
+  loadingText: { color: MUTED },
+
+  emptyFav: { alignItems: 'center', paddingVertical: 48 },
+  emptyFavText: { marginTop: 12, fontSize: 16, fontWeight: '700', color: colors.darkBlue },
+  emptyFavSub: { marginTop: 6, color: MUTED },
 });
 
 export default CryptoScreen;
