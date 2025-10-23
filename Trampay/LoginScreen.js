@@ -1,5 +1,5 @@
-// Tela de login do TramPay
-import React, { useState, useEffect, useRef } from 'react';
+// Tela de login do Trampay
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,39 +11,20 @@ import {
   Platform,
   StyleSheet,
   Image,
-  Animated,
 } from 'react-native';
 import { colors, globalStyles, spacing, fonts } from './styles';
+
+// Importando logo
+import Logo from './assets/logo_trampay_2025_2.png';
 
 const LoginScreen = ({ navigation, onLogin }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // animações
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 900,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
-    }
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
   };
 
   const validateForm = () => {
@@ -55,6 +36,7 @@ const LoginScreen = ({ navigation, onLogin }) => {
       newErrors.email = 'Por favor, insira um email válido';
 
     if (!formData.password) newErrors.password = 'Senha é obrigatória';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -96,39 +78,27 @@ const LoginScreen = ({ navigation, onLogin }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={globalStyles.screenContainer}
+        contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View
-          style={[
-            styles.modernContainer,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}
-        >
-          {/* LOGO */}
+        <View style={styles.modernContainer}>
+          {/* Logo Section */}
           <View style={styles.logoSection}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('./')} 
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
-              <Text style={styles.subWelcomeText}>
-                Entre na sua conta para continuar
-              </Text>
+            <View style={styles.logoBackground}>
+              <Image source={Logo} style={styles.logoImage} resizeMode="contain" />
             </View>
+            <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
+            <Text style={styles.subWelcomeText}>
+              Entre na sua conta para continuar
+            </Text>
           </View>
 
-          {/* FORMULÁRIO */}
+          {/* Form Section */}
           <View style={styles.formSection}>
             <View style={styles.inputContainer}>
               <Text style={styles.modernLabel}>EMAIL</Text>
               <TextInput
-                style={[
-                  styles.modernInput,
-                  errors.email && styles.inputError,
-                ]}
+                style={[styles.modernInput, errors.email && styles.inputError]}
                 placeholder="seu@email.com"
                 placeholderTextColor={colors.placeholder}
                 value={formData.email}
@@ -137,18 +107,13 @@ const LoginScreen = ({ navigation, onLogin }) => {
                 autoCapitalize="none"
                 returnKeyType="next"
               />
-              {errors.email && (
-                <Text style={styles.errorText}>{errors.email}</Text>
-              )}
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.modernLabel}>SENHA</Text>
               <TextInput
-                style={[
-                  styles.modernInput,
-                  errors.password && styles.inputError,
-                ]}
+                style={[styles.modernInput, errors.password && styles.inputError]}
                 placeholder="••••••••"
                 placeholderTextColor={colors.placeholder}
                 value={formData.password}
@@ -162,7 +127,7 @@ const LoginScreen = ({ navigation, onLogin }) => {
               )}
             </View>
 
-            {/* BOTÃO LOGIN */}
+            {/* Botão Login */}
             <TouchableOpacity
               style={[styles.modernButton, isLoading && styles.buttonDisabled]}
               onPress={handleLogin}
@@ -173,7 +138,7 @@ const LoginScreen = ({ navigation, onLogin }) => {
               </Text>
             </TouchableOpacity>
 
-            {/* LINKS */}
+            {/* Links */}
             <TouchableOpacity
               style={styles.linkContainer}
               onPress={() => navigation.navigate('ForgotPassword')}
@@ -191,183 +156,154 @@ const LoginScreen = ({ navigation, onLogin }) => {
               </Text>
             </TouchableOpacity>
 
-            {/* CONTA DEMO */}
+            {/* Contas de demonstração */}
             <View style={styles.demoContainer}>
               <Text style={styles.demoTitle}>Contas de demonstração:</Text>
               <Text style={styles.demoText}>Email: demo@trampay.com</Text>
               <Text style={styles.demoText}>Senha: 123456</Text>
             </View>
           </View>
-        </Animated.View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  modernContainer: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-
-  logoSection: {
+  modernContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
   },
-
-  logoContainer: {
+  logoSection: {
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-
-  logoImage: {
-    width: 130,
-    height: 130,
+  logoBackground: {
+    backgroundColor: colors.white,
+    borderRadius: 120,
+    padding: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: spacing.md,
+    marginTop: spacing.lg
   },
-
+  logoImage: {
+    width: 140,
+    height: 140,
+  },
   welcomeText: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: fonts.bold,
     color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.xs,
-    fontWeight: '700',
   },
-
   subWelcomeText: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: fonts.medium,
     color: colors.white,
     textAlign: 'center',
     opacity: 0.9,
   },
-
   formSection: {
     width: '100%',
     backgroundColor: colors.white,
     borderRadius: 24,
     padding: spacing.xl,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
-
   inputContainer: {
     marginBottom: spacing.lg,
   },
-
   modernLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: fonts.bold,
     color: colors.primaryDark,
     marginBottom: spacing.sm,
-    letterSpacing: 2,
   },
-
   modernInput: {
-    height: 58,
-    backgroundColor: '#f8f9fb',
-    borderRadius: 18,
-    paddingHorizontal: spacing.lg + 4,
-    fontSize: 17,
-    fontFamily: fonts.regular,
+    height: 52,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 14,
+    paddingHorizontal: spacing.lg,
+    fontSize: 16,
     color: colors.text,
-    borderWidth: 2,
-    borderColor: colors.lightGray,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
   },
-
   inputError: {
     borderColor: colors.error,
     backgroundColor: '#fff5f5',
   },
-
   errorText: {
     fontSize: 12,
-    fontFamily: fonts.regular,
     color: colors.error,
-    marginTop: spacing.xs,
-    marginLeft: spacing.sm,
+    marginTop: 4,
   },
-
   modernButton: {
-    height: 58,
+    height: 52,
     backgroundColor: colors.secondary,
-    borderRadius: 18,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg + 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    marginTop: spacing.md,
   },
-
   modernButtonText: {
-    fontSize: 19,
+    fontSize: 17,
     fontFamily: fonts.bold,
     color: colors.primaryDark,
-    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-
   buttonDisabled: {
     opacity: 0.6,
-    transform: [{ scale: 0.98 }],
   },
-
   linkContainer: {
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
-
   linkText: {
-    fontSize: 16,
-    fontFamily: fonts.bold,
-    color: colors.white,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
-
   createAccountText: {
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    color: colors.white,
+    fontSize: 14,
+    color: colors.primary,
     textAlign: 'center',
   },
-
   createAccountLink: {
-    fontFamily: fonts.bold,
     color: colors.secondary,
+    fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
-
   demoContainer: {
-    marginTop: spacing.xl,
-    padding: spacing.lg,
+    marginTop: spacing.lg,
+    padding: spacing.md,
     backgroundColor: colors.secondary,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.primary,
   },
-
   demoTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fonts.bold,
     color: colors.primaryDark,
-    marginBottom: spacing.sm,
   },
-
   demoText: {
     fontSize: 12,
     fontFamily: fonts.medium,
     color: colors.primaryDark,
-    marginBottom: 4,
   },
 });
 
