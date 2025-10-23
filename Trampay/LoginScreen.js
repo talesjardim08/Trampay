@@ -1,5 +1,5 @@
-// Tela de login do Trampay
-import React, { useState } from 'react';
+// Tela de login do TramPay
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,88 +9,75 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet
+  StyleSheet,
+  Image,
+  Animated,
 } from 'react-native';
 import { colors, globalStyles, spacing, fonts } from './styles';
 
 const LoginScreen = ({ navigation, onLogin }) => {
-  // Estados para os campos do formulário
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Função para atualizar dados do formulário
+  // animações
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const updateFormData = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    // Remove erro do campo quando usuário começa a digitar
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: null
-      }));
+      setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
-  // Validação dos campos
   const validateForm = () => {
     const newErrors = {};
-
-    // Validação do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!emailRegex.test(formData.email)) {
+
+    if (!formData.email.trim()) newErrors.email = 'Email é obrigatório';
+    else if (!emailRegex.test(formData.email))
       newErrors.email = 'Por favor, insira um email válido';
-    }
 
-    // Validação da senha
-    if (!formData.password) {
-      newErrors.password = 'Senha é obrigatória';
-    }
-
+    if (!formData.password) newErrors.password = 'Senha é obrigatória';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Função para fazer login
   const handleLogin = async () => {
     if (!validateForm()) return;
-
     setIsLoading(true);
-    
+
     try {
-      // Simula login (será integrado com Firebase depois)
-      // Credenciais de exemplo para demonstração
       const validEmail = 'demo@trampay.com';
       const validPassword = '123456';
-      
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       if (formData.email === validEmail && formData.password === validPassword) {
-        // Login bem-sucedido
-        if (onLogin) {
-          onLogin({
-            email: formData.email,
-            isAuthenticated: true
-          });
-        }
-        
-        // Navega para Home passando dados do usuário
-        navigation.navigate('Home', { 
+        onLogin?.({ email: formData.email, isAuthenticated: true });
+        navigation.navigate('Home', {
           user: {
             email: formData.email,
             name: formData.email.split('@')[0],
-            isAuthenticated: true
-          }
+            isAuthenticated: true,
+          },
         });
       } else {
-        // Credenciais inválidas
         Alert.alert(
           'Erro',
           'Email ou senha incorretos.\n\nPara demonstração use:\nEmail: demo@trampay.com\nSenha: 123456'
@@ -104,37 +91,48 @@ const LoginScreen = ({ navigation, onLogin }) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={globalStyles.container}
+    <KeyboardAvoidingView
+      style={[globalStyles.container, { backgroundColor: colors.primary }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={globalStyles.screenContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.modernContainer}>
-          {/* Logo Section */}
+        <Animated.View
+          style={[
+            styles.modernContainer,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          {/* LOGO */}
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
-              <Text style={styles.appTitle}>Trampay</Text>
+              <Image
+                source={require('./')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
               <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
-              <Text style={styles.subWelcomeText}>Entre na sua conta para continuar</Text>
+              <Text style={styles.subWelcomeText}>
+                Entre na sua conta para continuar
+              </Text>
             </View>
           </View>
 
-          {/* Form Section */}
+          {/* FORMULÁRIO */}
           <View style={styles.formSection}>
             <View style={styles.inputContainer}>
               <Text style={styles.modernLabel}>EMAIL</Text>
               <TextInput
                 style={[
                   styles.modernInput,
-                  errors.email && styles.inputError
+                  errors.email && styles.inputError,
                 ]}
                 placeholder="seu@email.com"
                 placeholderTextColor={colors.placeholder}
                 value={formData.email}
-                onChangeText={(value) => updateFormData('email', value)}
+                onChangeText={value => updateFormData('email', value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 returnKeyType="next"
@@ -149,12 +147,12 @@ const LoginScreen = ({ navigation, onLogin }) => {
               <TextInput
                 style={[
                   styles.modernInput,
-                  errors.password && styles.inputError
+                  errors.password && styles.inputError,
                 ]}
                 placeholder="••••••••"
                 placeholderTextColor={colors.placeholder}
                 value={formData.password}
-                onChangeText={(value) => updateFormData('password', value)}
+                onChangeText={value => updateFormData('password', value)}
                 secureTextEntry
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
@@ -164,12 +162,9 @@ const LoginScreen = ({ navigation, onLogin }) => {
               )}
             </View>
 
-            {/* Botão Login */}
+            {/* BOTÃO LOGIN */}
             <TouchableOpacity
-              style={[
-                styles.modernButton,
-                isLoading && styles.buttonDisabled
-              ]}
+              style={[styles.modernButton, isLoading && styles.buttonDisabled]}
               onPress={handleLogin}
               disabled={isLoading}
             >
@@ -178,34 +173,32 @@ const LoginScreen = ({ navigation, onLogin }) => {
               </Text>
             </TouchableOpacity>
 
-            {/* Link para Esqueci a Senha */}
+            {/* LINKS */}
             <TouchableOpacity
               style={styles.linkContainer}
               onPress={() => navigation.navigate('ForgotPassword')}
             >
-              <Text style={styles.linkText}>
-                Esqueci minha senha
-              </Text>
+              <Text style={styles.linkText}>Esqueci minha senha</Text>
             </TouchableOpacity>
 
-            {/* Link para Criar Conta */}
             <TouchableOpacity
               style={styles.linkContainer}
               onPress={() => navigation.navigate('CreateAccount')}
             >
               <Text style={styles.createAccountText}>
-                Não tem uma conta? <Text style={styles.createAccountLink}>Criar conta</Text>
+                Não tem uma conta?{' '}
+                <Text style={styles.createAccountLink}>Criar conta</Text>
               </Text>
             </TouchableOpacity>
 
-            {/* Credenciais de demonstração */}
+            {/* CONTA DEMO */}
             <View style={styles.demoContainer}>
               <Text style={styles.demoTitle}>Contas de demonstração:</Text>
               <Text style={styles.demoText}>Email: demo@trampay.com</Text>
               <Text style={styles.demoText}>Senha: 123456</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -229,23 +222,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
 
-
-  appTitle: {
-    fontSize: 48,
-    fontFamily: fonts.bold,
-    color: colors.primaryDark,
-    marginBottom: spacing.sm,
-    letterSpacing: 3,
-    fontWeight: '800',
-    textShadowColor: 'rgba(255, 194, 54, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+  logoImage: {
+    width: 130,
+    height: 130,
+    marginBottom: spacing.md,
   },
 
   welcomeText: {
     fontSize: 28,
     fontFamily: fonts.bold,
-    color: colors.primaryDark,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.xs,
     fontWeight: '700',
@@ -254,14 +240,21 @@ const styles = StyleSheet.create({
   subWelcomeText: {
     fontSize: 17,
     fontFamily: fonts.medium,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
-    opacity: 0.85,
-    fontWeight: '500',
+    opacity: 0.9,
   },
 
   formSection: {
     width: '100%',
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: spacing.xl,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
   },
 
   inputContainer: {
@@ -274,29 +267,18 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     marginBottom: spacing.sm,
     letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontWeight: '700',
   },
 
   modernInput: {
     height: 58,
-    backgroundColor: colors.white,
+    backgroundColor: '#f8f9fb',
     borderRadius: 18,
     paddingHorizontal: spacing.lg + 4,
     fontSize: 17,
     fontFamily: fonts.regular,
     color: colors.text,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: colors.lightGray,
-    fontWeight: '500',
-    shadowColor: colors.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
   },
 
   inputError: {
@@ -314,16 +296,13 @@ const styles = StyleSheet.create({
 
   modernButton: {
     height: 58,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.secondary,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: spacing.lg + 4,
     shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
@@ -332,10 +311,9 @@ const styles = StyleSheet.create({
   modernButtonText: {
     fontSize: 19,
     fontFamily: fonts.bold,
-    color: colors.white,
-    letterSpacing: 1.5,
+    color: colors.primaryDark,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    fontWeight: '800',
   },
 
   buttonDisabled: {
@@ -349,27 +327,23 @@ const styles = StyleSheet.create({
   },
 
   linkText: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.bold,
-    color: colors.primary,
+    color: colors.white,
     textDecorationLine: 'underline',
-    fontWeight: '700',
   },
 
   createAccountText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: fonts.medium,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
-    fontWeight: '500',
   },
 
   createAccountLink: {
     fontFamily: fonts.bold,
-    color: colors.primary,
+    color: colors.secondary,
     textDecorationLine: 'underline',
-    fontSize: 17,
-    fontWeight: '700',
   },
 
   demoContainer: {
