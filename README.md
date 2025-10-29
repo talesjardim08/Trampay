@@ -11,7 +11,7 @@ O **Trampay** é um aplicativo mobile desenvolvido como Trabalho de Conclusão d
 
 O objetivo do projeto é criar uma solução completa para **microempreendedores e pequenos negócios**, ajudando no **gerenciamento financeiro**, **organização de clientes**, **controle de estoque**, **serviços** e **simulação de impostos**, tudo em um único aplicativo simples e acessível.  
 
-O Trampay foi pensado para ser **intuitivo e seguro**, utilizando **Firebase** para autenticação e armazenamento em nuvem, permitindo que os dados fiquem sempre disponíveis para o usuário, independentemente do dispositivo.
+O Trampay foi pensado para ser **intuitivo e seguro**, utilizando **API.NET C# para conexão com o MySQL** para autenticação e armazenamento em nuvem, permitindo que os dados fiquem sempre disponíveis para o usuário, independentemente do dispositivo.
 
 ---
 
