@@ -36,19 +36,22 @@ O Trampay foi pensado para ser **intuitivo e seguro**, utilizando **API.NET C# p
 - **JavaScript / JSX** – linguagem principal  
 - **React Navigation** – gerenciamento de rotas  
 - **Context API e Hooks** – gerenciamento de estado  
-- **Firebase** – autenticação, banco de dados e armazenamento em nuvem  
+- **C# + MySQL** – autenticação, banco de dados e armazenamento em nuvem  
 - **Charts** – geração de gráficos para o fluxo de caixa  
 
 ---
 
 ## 👥 Integrantes
 
-|---------------------|-----------------|
-| **João Victor Queiroz**| 
-| **Maria Fernanda**| 
-| **Matheus Quaresma**| 
-| **Sophia Marques**| 
-| **Tales de Souza Jardim**|
+| Integrantes |
+|-------------|
+| **João Victor Queiroz** |
+| **Maria Fernanda** |
+| **Matheus Quaresma** |
+| **Sophia Marques** |
+| **Tales de Souza Jardim** |
+
+---
 
 **Orientação:** Prof.ª **Nathane Castro** – Etec de Taboão da Serra  
 
