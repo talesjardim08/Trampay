@@ -1,6 +1,12 @@
+using System.Threading.Tasks;
+
 public interface IUserService
 {
-    Task<ulong> CreateUserAsync(RegisterDto dto);
-    Task<User> GetByEmailAsync(string email);
-    Task<string> ValidateAndGenerateTokenAsync(string email, string password);
+    Task<ulong> CreateUserAsync(registerDto dto);
+    Task<User?> GetByEmailAsync(string email);
+    Task<User?> GetByIdAsync(ulong id);
+    Task<string?> ValidateAndGenerateTokenAsync(string email, string password);
+    Task<string?> CreatePasswordResetTokenAsync(string email);
+
+    Task<bool> ResetPasswordWithTokenAsync(string token, string newPassword);
 }

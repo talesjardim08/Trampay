@@ -1,17 +1,38 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
-// ===== Configuração dos serviços =====
+// services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Trampay API", Version = "v1" });
+    var jwtSecurityScheme = new OpenApiSecurityScheme
+    {
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Description = "JWT Authorization header using the Bearer scheme.",
+        Reference = new OpenApiReference { Id = JwtBearerDefaults.AuthenticationScheme, Type = ReferenceType.SecurityScheme }
+    };
+    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement { { jwtSecurityScheme, new string[] { } } });
+});
 
-// ===== JWT Authentication =====
-var jwtKey = config["Jwt:Key"] ?? "default_key_change_me";
+// DI - services (IUserService) will be defined in separate files
+builder.Services.AddScoped<IUserService, UserService>();
+
+// JWT
+var jwtKey = config["Jwt:Key"] ?? Environment.GetEnvironmentVariable("Jwt__Key") ?? "change_this_in_prod";
+var issuer = config["Jwt:Issuer"] ?? "TrampayApi";
+var audience = config["Jwt:Audience"] ?? "TrampayApp";
 var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(options =>
@@ -28,34 +49,25 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = config["Jwt:Issuer"] ?? "default_issuer",
-        ValidAudience = config["Jwt:Audience"] ?? "default_audience",
-        IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+        ClockSkew = TimeSpan.FromMinutes(2)
     };
 });
 
-// ===== Serviços personalizados =====
-builder.Services.AddScoped<IUserService, UserService>();
-
-// ===== Build do app =====
 var app = builder.Build();
 
-// ===== Swagger apenas no desenvolvimento =====
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// ===== Middlewares =====
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ===== Rotas =====
 app.MapControllers();
-
-// ===== Configurar para aceitar conexões externas =====
-app.Urls.Add("http://0.0.0.0:5125");
 
 app.Run();
