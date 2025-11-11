@@ -20,8 +20,8 @@ async function saveToken(token) {
 export async function login(email, senha) {
   try {
     const response = await api.post("/auth/login", {
-      Email: email,  
-      Senha: senha, 
+      email: email,  
+      senha: senha, 
     });
 
     if (!response.data || !response.data.token) {
@@ -46,7 +46,7 @@ export async function registerUser(userData) {
     legalName: userData.LegalName,
     displayName: userData.DisplayName,
     birthDate: userData.BirthDate,
-    Email: userData.Email,        // <- minúsculo
+    email: userData.Email,        // <- minúsculo
     phone: userData.Phone,
     addressStreet: userData.AddressStreet,
     addressNumber: userData.AddressNumber,
@@ -55,14 +55,28 @@ export async function registerUser(userData) {
     addressCity: userData.AddressCity,
     addressState: userData.AddressState,
     addressZip: userData.AddressZip,
-    Senha: userData.Senha || userData.password    // <- minúsculo e campo correto
+    senha: userData.Senha || userData.password    // <- minúsculo e campo correto
   };
 
+ try {
+    const res = await api.post("/auth/register", payload);
+    return { success: true, data: res.data };
+  } catch (err) {
+    const msg =
+      err.response?.data?.error ||
+      err.response?.data?.message ||
+      "Falha ao criar conta.";
+    return { success: false, message: msg };
+  }
+  
+  
   console.log("📦 Enviando payload:", payload);
 
   const res = await api.post("/auth/register", payload);
   return res.data;
 }
+
+
 
 
 // 🔄 ESQUECI SENHA
