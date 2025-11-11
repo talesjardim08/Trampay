@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace TrampayBackend.Controllers
 {
@@ -56,59 +57,57 @@ namespace TrampayBackend.Controllers
 
         // ---------- REGISTER
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] dynamic body)
+public async Task<IActionResult> Register([FromBody] JsonElement body)
+{
+    try
+    {
+        string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
+        string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
+        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "";
+        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "";
+        string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName");
+        string email = GetString(body, "Email") ?? GetString(body, "email");
+        string phone = GetString(body, "Phone") ?? GetString(body, "phone");
+        string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
+
+        if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
+            return BadRequest(new { error = "Email e senha são obrigatórios" });
+
+        var exists = await _db.QueryFirstOrDefaultAsync<int?>(
+            "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
+
+        if (exists != null)
+            return BadRequest(new { error = "Email já cadastrado" });
+
+        var hash = BCrypt.Net.BCrypt.HashPassword(senha);
+
+        var insert = @"
+            INSERT INTO users 
+              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, created_at)
+            VALUES
+              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, NOW());
+            SELECT LAST_INSERT_ID();";
+
+        var id = await _db.ExecuteScalarAsync<long>(insert, new
         {
-            try
-            {
-                // Extract fields robustly (supports Portuguese and English field names)
-                string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
-                string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
-                string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "";
-                string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "";
-                string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName");
-                string email = GetString(body, "Email") ?? GetString(body, "email");
-                string phone = GetString(body, "Phone") ?? GetString(body, "phone");
-                string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
+            AccountType = accountType,
+            DocumentType = documentType,
+            DocumentNumber = documentNumber,
+            LegalName = legalName,
+            DisplayName = displayName,
+            Email = email,
+            Phone = phone,
+            PasswordHash = hash
+        });
 
-                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
-                    return BadRequest(new { error = "Email e senha são obrigatórios" });
-
-                // check if email or document already exists
-                var exists = await _db.QueryFirstOrDefaultAsync<int?>("SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
-                if (exists != null) return BadRequest(new { error = "Email já cadastrado" });
-
-                // Hash password
-                var hash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-                // Insert user: map fields to your DB columns (adjust columns if your schema differs)
-                var insert = @"
-                    INSERT INTO users 
-                      (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, created_at)
-                    VALUES
-                      (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, NOW());
-                    SELECT LAST_INSERT_ID();";
-
-                var id = await _db.ExecuteScalarAsync<long>(insert, new
-                {
-                    AccountType = accountType,
-                    DocumentType = documentType,
-                    DocumentNumber = documentNumber,
-                    LegalName = legalName,
-                    DisplayName = displayName,
-                    Email = email,
-                    Phone = phone,
-                    PasswordHash = hash
-                });
-
-                var token = GenerateJwt(id);
-                return Ok(new { token, user = new { id, email } });
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message);
-            }
-        }
-
+        var token = GenerateJwt(id);
+        return Ok(new { token, user = new { id, email } });
+    }
+    catch (Exception ex)
+    {
+        return Problem(detail: ex.Message);
+    }
+}
         // ---------- FORGOT / RESET handled elsewhere (keeps compatibility with AuthResetController)
         // but kept here as convenience proxies (OPTIONAL)
 

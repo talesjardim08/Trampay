@@ -3,7 +3,7 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
 const api = axios.create({
-  baseURL: "https://trampay.onrender.com",
+  baseURL: "https://trampay.onrender.com/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -38,20 +38,30 @@ export async function login(email, senha) {
 
 // 🧾 REGISTRO
 export async function registerUser(userData) {
-  try {
-    const response = await api.post("/auth/register", userData);
-    return {
-      success: true,
-      message: response.data?.message || "Usuário cadastrado com sucesso",
-    };
-  } catch (error) {
-    console.error("Erro no registro:", error.response?.data || error.message);
-    return {
-      success: false,
-      message: error.response?.data?.message || "Erro ao registrar usuário",
-    };
-  }
+  // 🔥 Corrige campos para o formato esperado pelo backend
+  const payload = {
+    accountType: userData.AccountType,
+    documentType: userData.DocumentType,
+    documentNumber: userData.DocumentNumber,
+    legalName: userData.LegalName,
+    displayName: userData.DisplayName,
+    birthDate: userData.BirthDate,
+    email: userData.Email,          // <- minúsculo
+    phone: userData.Phone,
+    addressStreet: userData.AddressStreet,
+    addressNumber: userData.AddressNumber,
+    addressComplement: userData.AddressComplement,
+    addressNeighborhood: userData.AddressNeighborhood,
+    addressCity: userData.AddressCity,
+    addressState: userData.AddressState,
+    addressZip: userData.AddressZip,
+    password: userData.Senha,       // <- minúsculo e campo correto
+  };
+
+  const res = await api.post("/auth/register", payload);
+  return res.data;
 }
+
 
 // 🔄 ESQUECI SENHA
 export async function forgotPassword(payload) {
