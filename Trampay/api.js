@@ -1,18 +1,16 @@
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_BASE = "https://trampay.onrender.com";
 
 const api = axios.create({
-  baseURL: 'https://trampay.onrender.com/api',
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: `${API_BASE}/api`,
+  timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {
-  try {
-    const token = await AsyncStorage.getItem('userToken');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch (e) {
-    console.log('Token read error:', e);
-  }
+  const token = await AsyncStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 

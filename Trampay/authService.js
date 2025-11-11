@@ -1,32 +1,99 @@
-import api from './api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// src/screens/authService.js
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 
+const api = axios.create({
+  baseURL: "https://trampay.onrender.com",
+  headers: { "Content-Type": "application/json" },
+});
+
+// 🔒 Armazena token com segurança
+async function saveToken(token) {
+  try {
+    await SecureStore.setItemAsync("token", token);
+  } catch (err) {
+    console.error("Erro ao salvar token:", err);
+  }
+}
+
+// 🔑 LOGIN
 export async function login(email, senha) {
-  const res = await api.post('/auth/login', { Email: email, Senha: senha });
-  const { token, user } = res.data;
-  await AsyncStorage.setItem('userToken', token);
-  await AsyncStorage.setItem('userData', JSON.stringify(user));
-  return { token, user };
+  try {
+    const response = await api.post("/auth/login", {
+      email,
+      password: senha,
+    });
+
+    if (!response.data || !response.data.token) {
+      throw new Error("Token inválido retornado pelo servidor.");
+    }
+
+    await saveToken(response.data.token);
+    return response.data;
+  } catch (error) {
+    console.error("Erro no login:", error.response?.data || error.message);
+    throw error;
+  }
 }
 
-export async function register(payload) {
-  const res = await api.post('/auth/register', payload);
-  return res.data;
+// 🧾 REGISTRO
+export async function registerUser(userData) {
+  try {
+    const response = await api.post("/auth/register", userData);
+    return {
+      success: true,
+      message: response.data?.message || "Usuário cadastrado com sucesso",
+    };
+  } catch (error) {
+    console.error("Erro no registro:", error.response?.data || error.message);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Erro ao registrar usuário",
+    };
+  }
 }
 
-export async function forgotPassword(email) {
-  return await api.post('/auth/forgot-password', { Email: email });
+// 🔄 ESQUECI SENHA
+export async function forgotPassword(payload) {
+  try {
+    const response = await api.post("/auth/forgot-password", payload);
+    return {
+      success: true,
+      message:
+        response.data?.message || "E-mail de redefinição enviado com sucesso.",
+    };
+  } catch (error) {
+    console.error("Erro no esqueci senha:", error.response?.data || error.message);
+    return {
+      success: false,
+      message:
+        error.response?.data?.message ||
+        "Não foi possível enviar o e-mail de recuperação.",
+    };
+  }
 }
 
-export async function resetPassword(email, token, newPassword) {
-  return await api.post('/auth/reset-password', {
-    Email: email,
-    Token: token,
-    NewPassword: newPassword,
-  });
+// 👤 PERFIL (verifica token)
+export async function getUserProfile() {
+  try {
+    const token = await SecureStore.getItemAsync("token");
+    if (!token) return null;
+
+    const response = await api.get("/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao obter perfil:", error.response?.data || error.message);
+    return null;
+  }
 }
 
+// 🚪 LOGOUT
 export async function logout() {
-  await AsyncStorage.removeItem('userToken');
-  await AsyncStorage.removeItem('userData');
+  try {
+    await SecureStore.deleteItemAsync("token");
+  } catch (error) {
+    console.error("Erro ao sair:", error);
+  }
 }

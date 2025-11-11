@@ -5,14 +5,12 @@ namespace TrampayBackend.Services
 {
     public interface IAuthService
     {
-        /// <summary>
-        /// Valida email e senha e retorna o usuário autenticado, ou null.
-        /// </summary>
-        Task<User?> AuthenticateAsync(string email, string password);
+        (string Hash, string Salt) HashPassword(string password, string? salt = null);
+        bool VerifyPassword(string password, string hash, string salt);
+        string GenerateJwtToken(long userId, string? email, string? role = "user");
 
-        /// <summary>
-        /// Cadastra novo usuário com hash da senha.
-        /// </summary>
-        Task<User> RegisterAsync(User newUser, string password);
+        // === novos métodos ===
+        Task<(bool Success, string Message, string? Token)> AuthenticateAsync(string email, string password);
+        Task<(bool Success, string Message, string? Token)> RegisterAsync(User newUser, string password);
     }
 }

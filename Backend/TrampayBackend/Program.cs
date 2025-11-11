@@ -103,6 +103,11 @@ services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
     options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
 });
 
+// registrar AuthService e EmailService (antes do Build)
+builder.Services.AddSingleton<TrampayBackend.Services.IAuthService, TrampayBackend.Services.AuthService>();
+builder.Services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
+
+
 // -----------------------------
 // Build
 // -----------------------------
@@ -162,7 +167,7 @@ using (var scope = app.Services.CreateScope())
         try
         {
             var admin = await auth.AuthenticateAsync("admin@oxente.com", "oxente123");
-            if (admin == null)
+            if (!admin.Success) // 👈 correção principal
             {
                 var newAdmin = new TrampayBackend.Models.User
                 {
@@ -178,14 +183,18 @@ using (var scope = app.Services.CreateScope())
                 };
 
                 await auth.RegisterAsync(newAdmin, "oxente123");
+                Console.WriteLine("Usuário admin criado com sucesso!");
+            }
+            else
+            {
+                Console.WriteLine("Usuário admin já existe ou login bem-sucedido.");
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // ignore seed errors
+            Console.WriteLine($"Erro ao criar admin: {ex.Message}");
         }
     }
 }
-
 
 app.Run();

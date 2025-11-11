@@ -30,7 +30,7 @@ export default function LoginScreen({ navigation }) {
     Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
   }, []);
 
-   async function handleLogin() {
+  async function handleLogin() {
     if (!email || !senha) {
       Alert.alert('Erro', 'Preencha email e senha');
       return;

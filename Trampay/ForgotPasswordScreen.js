@@ -1,4 +1,3 @@
-// src/screens/ForgotPasswordScreen.js
 import React, { useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -15,7 +14,7 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { forgotPassword } from './components/authService';
+import { forgotPassword } from './authService';
 import { colors, spacing, fonts } from './styles';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -60,8 +59,6 @@ export default function ForgotPasswordScreen({ navigation }) {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Animated.View style={[styles.container, { opacity: fade }]}>
-            
-            {/* LOGO */}
             <Image
               source={require('./assets/logo_trampay_2025_2.png')}
               style={styles.logo}
@@ -114,17 +111,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  logo: {
-    width: 140,
-    height: 140,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
+  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  logo: { width: 140, height: 140, alignSelf: 'center', marginBottom: 16 },
   card: {
     backgroundColor: colors.white,
     padding: spacing.lg,
@@ -134,25 +122,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  title: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    color: colors.primaryDark,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: 13,
-    color: colors.primaryDark,
-    marginBottom: 6,
-    fontFamily: fonts.semibold,
-  },
+  title: { fontSize: 22, fontFamily: fonts.bold, color: colors.primaryDark, textAlign: 'center', marginBottom: 6 },
+  subtitle: { fontSize: 13, color: colors.textLight, textAlign: 'center', marginBottom: spacing.lg },
+  label: { fontSize: 13, color: colors.primaryDark, marginBottom: 6, fontFamily: fonts.semibold },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -164,15 +136,8 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 8,
   },
-  icon: {
-    marginRight: 6,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    fontFamily: fonts.regular,
-    color: colors.text,
-  },
+  icon: { marginRight: 6 },
+  input: { flex: 1, height: '100%', fontFamily: fonts.regular, color: colors.text },
   primaryBtn: {
     marginTop: spacing.md,
     backgroundColor: colors.primary,
@@ -181,14 +146,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: {
-    color: colors.primaryDark,
-    fontFamily: fonts.bold,
-    fontSize: 16,
-  },
-  link: {
-    color: colors.primary,
-    textAlign: 'center',
-    fontFamily: fonts.semibold,
-  },
+  primaryBtnText: { color: colors.primaryDark, fontFamily: fonts.bold, fontSize: 16 },
+  link: { color: colors.primary, textAlign: 'center', fontFamily: fonts.semibold },
 });
