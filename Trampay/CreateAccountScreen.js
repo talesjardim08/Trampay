@@ -12,13 +12,12 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  FlatList
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaskedTextInput } from 'react-native-mask-text';
-import { Picker } from '@react-native-picker/picker';
-import { registerUser } from './api';
-import { colors, spacing, fonts } from './styles';
+import { registerUser } from '../api';
+import { colors, spacing, fonts } from '../styles';
 
 export default function CreateAccountScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
@@ -71,24 +70,27 @@ export default function CreateAccountScreen({ navigation }) {
       const payload = {
         AccountType: form.accountType,
         DocumentType: form.accountType === 'pf' ? 'CPF' : 'CNPJ',
-        DocumentNumber: form.documentNumber,
-        LegalName: form.legalName,
-        DisplayName: form.displayName,
-        Email: form.email,
+        DocumentNumber: form.documentNumber.replace(/\D/g, ''),
+        LegalName: form.legalName.trim(),
+        DisplayName: form.displayName.trim(),
+        Email: form.email.trim(),
         Phone: form.phone,
         AddressState: form.addressState,
         AddressCity: form.addressCity,
         Password: form.password,
       };
+
       const res = await registerUser(payload);
-      if (res && res.id) {
-        Alert.alert('Sucesso', 'Conta criada com sucesso!');
-        navigation.navigate('Login');
+
+      if (res && res.success) {
+        Alert.alert('Sucesso', 'Conta criada com sucesso!', [
+          { text: 'OK', onPress: () => navigation.navigate('Login') },
+        ]);
       } else {
         Alert.alert('Erro', res?.message || 'Falha ao criar conta.');
       }
     } catch (e) {
-      Alert.alert('Erro', e.message);
+      Alert.alert('Erro', e.message || 'Falha ao se conectar ao servidor.');
     } finally {
       setLoading(false);
     }
@@ -108,12 +110,16 @@ export default function CreateAccountScreen({ navigation }) {
                 <TouchableOpacity
                   onPress={() => update('accountType', 'pf')}
                   style={[styles.chip, form.accountType === 'pf' && styles.chipActive]}>
-                  <Text style={[styles.chipText, form.accountType === 'pf' && styles.chipTextActive]}>Pessoa Física</Text>
+                  <Text style={[styles.chipText, form.accountType === 'pf' && styles.chipTextActive]}>
+                    Pessoa Física
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => update('accountType', 'pj')}
                   style={[styles.chip, form.accountType === 'pj' && styles.chipActive]}>
-                  <Text style={[styles.chipText, form.accountType === 'pj' && styles.chipTextActive]}>Pessoa Jurídica</Text>
+                  <Text style={[styles.chipText, form.accountType === 'pj' && styles.chipTextActive]}>
+                    Pessoa Jurídica
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -167,7 +173,11 @@ export default function CreateAccountScreen({ navigation }) {
               <Text style={styles.label}>Cidade</Text>
               <TouchableOpacity
                 style={styles.selectBtn}
-                onPress={() => form.addressState ? setShowCityPicker(true) : Alert.alert('Atenção', 'Selecione o estado primeiro')}>
+                onPress={() =>
+                  form.addressState
+                    ? setShowCityPicker(true)
+                    : Alert.alert('Atenção', 'Selecione o estado primeiro')
+                }>
                 <Text style={{ color: form.addressCity ? colors.text : colors.placeholder }}>
                   {form.addressCity || 'Selecionar Cidade'}
                 </Text>
@@ -208,7 +218,7 @@ export default function CreateAccountScreen({ navigation }) {
         </KeyboardAvoidingView>
       </LinearGradient>
 
-      {/* MODAL DE ESTADOS */}
+      {/* MODAIS */}
       <Modal visible={showStatePicker} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Selecione o Estado</Text>
@@ -232,7 +242,6 @@ export default function CreateAccountScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL DE CIDADES */}
       <Modal visible={showCityPicker} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Selecione a Cidade</Text>
@@ -301,8 +310,6 @@ const styles = StyleSheet.create({
   primaryBtn: { marginTop: spacing.md, backgroundColor: colors.primary, height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { color: colors.primaryDark, fontFamily: fonts.bold, fontSize: 16 },
   link: { color: colors.primary, textAlign: 'center', marginTop: spacing.md, fontFamily: fonts.semibold },
-
-  // Modal
   modalContainer: { flex: 1, backgroundColor: '#fff', padding: 20 },
   modalTitle: { fontSize: 20, fontFamily: fonts.bold, color: colors.primaryDark, marginBottom: 20 },
   modalItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },

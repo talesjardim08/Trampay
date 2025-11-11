@@ -1,36 +1,53 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
-  SafeAreaView, View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Image, Alert
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { loginUser } from './api';
-import * as SecureStore from 'expo-secure-store';
-import { colors, spacing, fonts } from './styles';
-import { MaterialIcons } from '@expo/vector-icons';
+  SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Animated,
+  Image,
+  Alert,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
+import { MaterialIcons } from "@expo/vector-icons";
+import { loginUser } from "./components/authService"; 
+import { colors, spacing, fonts } from "../styles"; 
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [secure, setSecure] = useState(true);
   const fade = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start(), []);
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  }, []);
 
   const handleLogin = async () => {
-    if (!email || !senha) return Alert.alert('Atenção', 'Preencha e-mail e senha');
+    if (!email || !senha) return Alert.alert("Atenção", "Preencha e-mail e senha");
+
+    setLoading(true);
     try {
-      setLoading(true);
       const res = await loginUser({ Email: email.trim(), Senha: senha });
+
       if (res.token) {
-        await SecureStore.setItemAsync('token', res.token);
-        navigation.replace('Home');
+        await SecureStore.setItemAsync("token", res.token);
+        await SecureStore.setItemAsync("user", JSON.stringify(res.user));
+        Alert.alert("Sucesso", "Login realizado com sucesso!");
+        navigation.replace("Home");
       } else {
-        Alert.alert('Erro', res.message || 'Credenciais inválidas');
+        Alert.alert("Erro", res.message || "Credenciais inválidas");
       }
     } catch (e) {
-      Alert.alert('Erro', e.message || 'Falha ao autenticar');
+      console.error(e);
+      Alert.alert("Erro", "Falha ao autenticar. Verifique sua conexão.");
     } finally {
       setLoading(false);
     }
@@ -38,11 +55,17 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <LinearGradient colors={[colors.primary, colors.backgroundGradientEnd || '#fff']} style={styles.bg}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={[colors.primary, colors.backgroundGradientEnd || "#fff"]}
+        style={styles.bg}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
           <Animated.View style={[styles.container, { opacity: fade }]}>
             <Image
-              source={require('./assets/logo_trampay_2025_2.png')}
+              source={require("../assets/logo_trampay_2025_2.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -69,15 +92,26 @@ export default function LoginScreen({ navigation }) {
                   placeholder="Digite sua senha"
                 />
                 <TouchableOpacity onPress={() => setSecure(!secure)} style={styles.eyeBtn}>
-                  <MaterialIcons name={secure ? 'visibility-off' : 'visibility'} size={22} color={colors.text} />
+                  <MaterialIcons
+                    name={secure ? "visibility-off" : "visibility"}
+                    size={22}
+                    color={colors.text}
+                  />
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgot}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("ForgotPassword")}
+                style={styles.forgot}
+              >
                 <Text style={styles.forgotText}>Esqueci minha senha</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={handleLogin}
+                disabled={loading}
+              >
                 {loading ? (
                   <ActivityIndicator color={colors.primaryDark} />
                 ) : (
@@ -87,7 +121,7 @@ export default function LoginScreen({ navigation }) {
 
               <View style={styles.row}>
                 <Text style={styles.small}>Ainda não tem conta?</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('CreateAccount')}>
+                <TouchableOpacity onPress={() => navigation.navigate("CreateAccount")}>
                   <Text style={styles.link}> Criar conta</Text>
                 </TouchableOpacity>
               </View>
@@ -104,12 +138,18 @@ const styles = StyleSheet.create({
   logo: {
     width: 160,
     height: 160,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 10,
     marginTop: 50,
   },
   container: { flex: 1, padding: spacing.lg },
-  title: { textAlign: 'center', fontSize: 22, color: colors.primaryDark, fontFamily: fonts.bold, marginBottom: 16 },
+  title: {
+    textAlign: "center",
+    fontSize: 22,
+    color: colors.primaryDark,
+    fontFamily: fonts.bold,
+    marginBottom: 16,
+  },
   card: {
     backgroundColor: colors.white,
     padding: spacing.lg,
@@ -127,22 +167,22 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 12,
     marginBottom: spacing.sm,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
-  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordRow: { flexDirection: "row", alignItems: "center" },
   eyeBtn: { padding: 8, marginLeft: 8 },
-  forgot: { alignSelf: 'flex-end', marginTop: 4 },
+  forgot: { alignSelf: "flex-end", marginTop: 4 },
   forgotText: { color: colors.primary, fontFamily: fonts.semibold },
   primaryBtn: {
     marginTop: spacing.md,
     backgroundColor: colors.primary,
     height: 52,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   primaryBtnText: { color: colors.primaryDark, fontFamily: fonts.bold, fontSize: 16 },
-  row: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.md },
+  row: { flexDirection: "row", justifyContent: "center", marginTop: spacing.md },
   small: { color: colors.textLight },
   link: { color: colors.primary, fontFamily: fonts.semibold },
 });
