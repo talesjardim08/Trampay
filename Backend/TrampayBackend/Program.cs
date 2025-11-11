@@ -5,28 +5,33 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using TrampayBackend.Middleware;
-
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
+// Use builder.Services (evitar modificar app.Services após Build)
 var services = builder.Services;
 
-// ------------------------------------------------------
-// CONFIGURAÇÕES DO BANCO DE DADOS
-// ------------------------------------------------------
-var connStr = configuration.GetConnectionString("Default")
-              ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default")
-              ?? "Server=127.0.0.1;Port=3306;Database=trampay_tcc;Uid=root;Pwd=root;";
+// ---------------------------
+// Connection string (MySQL)
+// ---------------------------
+// Preferir variável de ambiente "MYSQL_CONNECTION" ou ConnectionStrings:DefaultConnection
+var connStr = configuration.GetConnectionString("DefaultConnection")
+           ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
+           ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=YOUR_USER;Password=YOUR_PASS;";
 
+// ---------------------------
+// Registros de serviços (todos ANTES do Build)
+// ---------------------------
+
+// DB connection factory (se seu código usa IDbConnection diretamente)
 services.AddTransient<IDbConnection>(_ => new MySqlConnection(connStr));
 
-// ------------------------------------------------------
-// CONFIGURAÇÕES JWT
-// ------------------------------------------------------
-var jwtKey = configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("Jwt__Key") ?? "troquesecreta_dev_mude";
-var jwtIssuer = configuration["Jwt:Issuer"] ?? "trampay.local";
-var jwtAudience = configuration["Jwt:Audience"] ?? "trampay.local";
-var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+// Authentication - JWT (exemplo mínimo; ajuste issuer/secret conforme necessário)
+var jwtSecret = configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "troque-essa-chave-por-uma-segura";
+var jwtIssuer = configuration["Jwt:Issuer"] ?? "TrampayBackend";
+var key = Encoding.ASCII.GetBytes(jwtSecret);
 
 services.AddAuthentication(options =>
 {
@@ -40,73 +45,90 @@ services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
-        ValidateIssuer = true,
-        ValidIssuer = jwtIssuer,
-        ValidateAudience = true,
-        ValidAudience = jwtAudience,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromMinutes(2)
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false,
     };
 });
 
-// ------------------------------------------------------
-// CONFIGURAÇÕES CORS E SWAGGER
-// ------------------------------------------------------
+// CORS - permitir frontend (ajuste conforme seu domínio)
 services.AddCors(o => o.AddPolicy("FrontendPolicy", p =>
 {
     p.AllowAnyHeader()
      .AllowAnyMethod()
-     .AllowAnyOrigin(); // Em produção, troque por .WithOrigins("https://seu-front.render.com")
+     .AllowAnyOrigin();
 }));
 
+// Swagger / OpenAPI
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Trampay API", Version = "v1" });
-
-    var jwtScheme = new OpenApiSecurityScheme
+    // JWT auth in swagger (opcional)
+    var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
+        Description = "Enter JWT Bearer token **_only_**",
+        In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Autenticação JWT (Bearer token)"
+        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
     };
-
-    c.AddSecurityDefinition("Bearer", jwtScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        { jwtScheme, Array.Empty<string>() }
+    c.AddSecurityDefinition("Bearer", securityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+        { securityScheme, new string[] { } }
     });
 });
 
+// Controllers
 services.AddControllers();
 
-var app = builder.Build();
-
-// registrar EmailService
+// Se seu projeto tem IEmailService/EmailService, registrar aqui (antes do Build)
 services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
 
-// permitir form file large uploads (ajuste se necessário)
+// Configurar FormOptions para upload (se usa upload multipart grande)
 services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
+    options.MultipartBodyLengthLimit = 1024 * 1024 * 200; // 200 MB (ajuste)
+    options.BufferBody = false;
 });
 
-
-// ------------------------------------------------------
-// PIPELINE
-// ------------------------------------------------------
-app.UseRouting();
-
-app.UseErrorHandler(); // middleware global - coloque antes de outras middlewares
+// Qualquer outro service registration que seu projeto precisar:
+ // services.AddScoped<...>();
+ // services.AddTransient<...>();
+ // services.AddHttpClient();
 
 
+// ---------------------------
+// Agora construímos o app (Build)
+// ---------------------------
+var app = builder.Build();
+
+
+// ---------------------------
+// Middlewares (após Build)
+// ---------------------------
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    // Em produção, você pode querer um handler de erros customizado
+    app.UseExceptionHandler("/error");
+}
+
+// Habilitar CORS, Auth e Authorization
 app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Registrar middleware global de erros se você tiver (referência do seu projeto)
+app.UseMiddleware<ErrorHandlerMiddleware>();
+app.UseErrorHandler(); // se essa extensão existir no seu projeto
 
 // Permitir upload e servir arquivos estáticos
 var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
@@ -115,18 +137,11 @@ if (!Directory.Exists(uploadsDir))
 
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    FileProvider = new PhysicalFileProvider(uploadsDir),
     RequestPath = "/uploads"
 });
 
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
+// Mapear controllers e endpoints
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow }));
 
