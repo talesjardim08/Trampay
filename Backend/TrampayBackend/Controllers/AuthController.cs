@@ -18,6 +18,7 @@ namespace TrampayBackend.Controllers
     {
         private readonly IDbConnection _db;
         private readonly IConfiguration _cfg;
+
         public AuthController(IDbConnection db, IConfiguration cfg)
         {
             _db = db;
@@ -26,11 +27,10 @@ namespace TrampayBackend.Controllers
 
         // ---------- LOGIN
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] dynamic body)
+        public async Task<IActionResult> Login([FromBody] JsonElement body)
         {
             try
             {
-                // support both Portuguese ("Senha") and English ("Password")
                 string email = GetString(body, "Email") ?? GetString(body, "email");
                 string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
 
@@ -57,61 +57,59 @@ namespace TrampayBackend.Controllers
 
         // ---------- REGISTER
         [HttpPost("register")]
-public async Task<IActionResult> Register([FromBody] JsonElement body)
-{
-    try
-    {
-        string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
-        string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
-        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "";
-        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "";
-        string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName");
-        string email = GetString(body, "Email") ?? GetString(body, "email");
-        string phone = GetString(body, "Phone") ?? GetString(body, "phone");
-        string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
-
-        if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
-            return BadRequest(new { error = "Email e senha são obrigatórios" });
-
-        var exists = await _db.QueryFirstOrDefaultAsync<int?>(
-            "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
-
-        if (exists != null)
-            return BadRequest(new { error = "Email já cadastrado" });
-
-        var hash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-        var insert = @"
-            INSERT INTO users 
-              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, created_at)
-            VALUES
-              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, NOW());
-            SELECT LAST_INSERT_ID();";
-
-        var id = await _db.ExecuteScalarAsync<long>(insert, new
+        public async Task<IActionResult> Register([FromBody] JsonElement body)
         {
-            AccountType = accountType,
-            DocumentType = documentType,
-            DocumentNumber = documentNumber,
-            LegalName = legalName,
-            DisplayName = displayName,
-            Email = email,
-            Phone = phone,
-            PasswordHash = hash
-        });
+            try
+            {
+                string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
+                string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
+                string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "";
+                string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "";
+                string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName");
+                string email = GetString(body, "Email") ?? GetString(body, "email");
+                string phone = GetString(body, "Phone") ?? GetString(body, "phone");
+                string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
 
-        var token = GenerateJwt(id);
-        return Ok(new { token, user = new { id, email } });
-    }
-    catch (Exception ex)
-    {
-        return Problem(detail: ex.Message);
-    }
-}
-        // ---------- FORGOT / RESET handled elsewhere (keeps compatibility with AuthResetController)
-        // but kept here as convenience proxies (OPTIONAL)
+                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
+                    return BadRequest(new { error = "Email e senha são obrigatórios" });
 
-        // ---------- Helpers
+                var exists = await _db.QueryFirstOrDefaultAsync<int?>(
+                    "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
+
+                if (exists != null)
+                    return BadRequest(new { error = "Email já cadastrado" });
+
+                var hash = BCrypt.Net.BCrypt.HashPassword(senha);
+
+                var insert = @"
+                    INSERT INTO users 
+                      (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, created_at)
+                    VALUES
+                      (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, NOW());
+                    SELECT LAST_INSERT_ID();";
+
+                var id = await _db.ExecuteScalarAsync<long>(insert, new
+                {
+                    AccountType = accountType,
+                    DocumentType = documentType,
+                    DocumentNumber = documentNumber,
+                    LegalName = legalName,
+                    DisplayName = displayName,
+                    Email = email,
+                    Phone = phone,
+                    PasswordHash = hash
+                });
+
+                var token = GenerateJwt(id);
+                return Ok(new { token, user = new { id, email } });
+            }
+            catch (Exception ex)
+            {
+                return Problem(detail: ex.Message);
+            }
+        }
+
+        // ---------- Helpers ----------
         private string GenerateJwt(long userId)
         {
             var key = _cfg["Jwt:Key"] ?? Environment.GetEnvironmentVariable("Jwt__Key") ?? "troquesecreta_dev_mude";
@@ -132,57 +130,29 @@ public async Task<IActionResult> Register([FromBody] JsonElement body)
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        // dynamic property getter (safely returns string or null)
-        private string? GetString(dynamic body, string name)
+        // ✅ Método fixo para leitura segura de campos no JSON
+        private string? GetString(JsonElement body, string name)
         {
             try
             {
-                if (body == null) return null;
-                // attempt dictionary-like access (System.Text.Json produces JsonElement when using dynamic)
-                var dict = body as System.Text.Json.JsonElement?;
-                // try to read by property if dynamic object presents members
-                try
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(body);
-                    using var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty(name, out System.Text.Json.JsonElement prop))
+                if (body.ValueKind != JsonValueKind.Object)
+                    return null;
 
-                    {
-                        if (prop.ValueKind == System.Text.Json.JsonValueKind.String) return prop.GetString();
-                        else return prop.ToString();
-                    }
-                    foreach (var p in doc.RootElement.EnumerateObject())
-                    {
-                        if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return p.Value.ValueKind == System.Text.Json.JsonValueKind.String ? p.Value.GetString() : p.Value.ToString();
-                        }
-                    }
-                }
-                catch
+                // Tenta buscar exatamente
+                if (body.TryGetProperty(name, out JsonElement prop))
                 {
-                    // fallback: try reflection/dynamic (for ExpandoObject or dictionaries)
-                    var value = (object?)body;
-                    var t = value?.GetType();
-                    if (t != null)
-                    {
-                        var prop = t.GetProperty(name);
-                        if (prop != null)
-                        {
-                            var v = prop.GetValue(value);
-                            return v?.ToString();
-                        }
-                        // try lower-case property
-                        prop = t.GetProperty(Char.ToUpperInvariant(name[0]) + name.Substring(1));
-                        if (prop != null)
-                        {
-                            var v = prop.GetValue(value);
-                            return v?.ToString();
-                        }
-                    }
+                    if (prop.ValueKind == JsonValueKind.String) return prop.GetString();
+                    else return prop.ToString();
+                }
+
+                // Tenta buscar ignorando maiúsculas/minúsculas
+                foreach (var p in body.EnumerateObject())
+                {
+                    if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                        return p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : p.Value.ToString();
                 }
             }
-            catch { /* swallow */ }
+            catch { }
             return null;
         }
 
