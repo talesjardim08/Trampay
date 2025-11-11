@@ -17,6 +17,9 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] registerDto dto)
     {
+
+        Console.WriteLine($"[DEBUG] Payload recebido: {System.Text.Json.JsonSerializer.Serialize(dto)}");
+
         if (dto == null) return BadRequest(new { message = "Payload inválido" });
         if (string.IsNullOrEmpty(dto.Senha)) return BadRequest(new { message = "Senha obrigatória" });
 

@@ -5,22 +5,22 @@ import { API_URL } from "../api";
  */
 export async function registerUser(form) {
   const payload = {
-    accountType: form.accountType,
-    documentType: form.accountType === "pf" ? "CPF" : "CNPJ",
-    documentNumber: form.documentNumber,
-    legalName: form.legalName,
-    displayName: form.displayName,
-    birthDate: new Date().toISOString(), 
-    email: form.email,
-    phone: form.phone,
-    addressStreet: form.addressStreet || "",
-    addressNumber: form.addressNumber || "",
-    addressComplement: form.addressComplement || "",
-    addressNeighborhood: form.addressNeighborhood || "",
-    addressCity: form.addressCity,
-    addressState: form.addressState,
-    addressZip: form.addressZip || "",
-    senha: form.password, // ⚠️ o backend espera "senha"
+    AccountType: form.accountType,
+    DocumentType: form.accountType === "pf" ? "CPF" : "CNPJ",
+    DocumentNumber: form.documentNumber,
+    LegalName: form.legalName,
+    DisplayName: form.displayName || null,
+    BirthDate: form.birthDate || new Date().toISOString(),
+    Email: form.email,
+    Phone: form.phone,
+    AddressStreet: form.addressStreet || null,
+    AddressNumber: form.addressNumber || null,
+    AddressComplement: form.addressComplement || null,
+    AddressNeighborhood: form.addressNeighborhood || null,
+    AddressCity: form.addressCity,
+    AddressState: form.addressState,
+    AddressZip: form.addressZip || null,
+    Senha: form.password, // ⚠️ nome exato do backend (C#)
   };
 
   try {
@@ -31,8 +31,6 @@ export async function registerUser(form) {
     });
 
     const text = await response.text();
-
-    // Tenta converter em JSON (evita o erro "Unexpected end of input")
     try {
       return JSON.parse(text);
     } catch {
@@ -51,7 +49,7 @@ export async function loginUser(email, senha) {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, senha }), // backend usa "Email" e "Senha" no DTO
+      body: JSON.stringify({ Email: email, Senha: senha }), // C# é case-sensitive
     });
 
     const text = await response.text();
@@ -73,7 +71,7 @@ export async function forgotPassword(email) {
     const response = await fetch(`${API_URL}/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ Email: email }), // letra maiúscula conforme DTO C#
     });
 
     const text = await response.text();
@@ -95,7 +93,7 @@ export async function resetPassword(token, newPassword) {
     const response = await fetch(`${API_URL}/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify({ Token: token, NewPassword: newPassword }),
     });
 
     const text = await response.text();

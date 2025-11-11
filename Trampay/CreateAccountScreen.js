@@ -70,15 +70,22 @@ export default function CreateAccountScreen({ navigation }) {
       const payload = {
         AccountType: form.accountType,
         DocumentType: form.accountType === 'pf' ? 'CPF' : 'CNPJ',
-        DocumentNumber: form.documentNumber.replace(/\D/g, ''),
-        LegalName: form.legalName.trim(),
-        DisplayName: form.displayName.trim(),
-        Email: form.email.trim(),
+        DocumentNumber: form.documentNumber,
+        LegalName: form.legalName,
+        DisplayName: form.displayName,
+        BirthDate: null,
+        Email: form.email,
         Phone: form.phone,
-        AddressState: form.addressState,
+        AddressStreet: null,
+        AddressNumber: null,
+        AddressComplement: null,
+        AddressNeighborhood: null,
         AddressCity: form.addressCity,
-        Password: form.password,
+        AddressState: form.addressState,
+        AddressZip: null,
+        Senha: form.password,
       };
+
 
       const res = await registerUser(payload);
 
