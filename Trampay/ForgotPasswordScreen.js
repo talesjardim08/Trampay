@@ -15,8 +15,8 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { forgotPassword } from '../api';
-import { colors, spacing, fonts } from '../styles';
+import { forgotPassword } from './components/authService';
+import { colors, spacing, fonts } from './styles';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function ForgotPasswordScreen({ navigation }) {
@@ -63,7 +63,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             
             {/* LOGO */}
             <Image
-              source={require('../assets/logo_trampay_2025_2.png')}
+              source={require('./assets/logo_trampay_2025_2.png')}
               style={styles.logo}
               resizeMode="contain"
             />

@@ -17,7 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import { MaterialIcons } from "@expo/vector-icons";
 import { loginUser } from "./components/authService"; 
-import { colors, spacing, fonts } from "../styles"; 
+import { colors, spacing, fonts } from "./styles"; 
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -65,7 +65,7 @@ export default function LoginScreen({ navigation }) {
         >
           <Animated.View style={[styles.container, { opacity: fade }]}>
             <Image
-              source={require("../assets/logo_trampay_2025_2.png")}
+              source={require('./assets/logo_trampay_2025_2.png')}
               style={styles.logo}
               resizeMode="contain"
             />

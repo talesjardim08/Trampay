@@ -16,8 +16,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaskedTextInput } from 'react-native-mask-text';
-import { registerUser } from '../api';
-import { colors, spacing, fonts } from '../styles';
+import { registerUser } from './components/authService';
+import { colors, spacing, fonts } from './styles';
 
 export default function CreateAccountScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
