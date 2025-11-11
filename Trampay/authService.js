@@ -20,8 +20,8 @@ async function saveToken(token) {
 export async function login(email, senha) {
   try {
     const response = await api.post("/auth/login", {
-      email,
-      password: senha,
+      Email: email,  
+      Senha: senha, 
     });
 
     if (!response.data || !response.data.token) {
@@ -46,7 +46,7 @@ export async function registerUser(userData) {
     legalName: userData.LegalName,
     displayName: userData.DisplayName,
     birthDate: userData.BirthDate,
-    email: userData.Email,          // <- minúsculo
+    Email: userData.Email,        // <- minúsculo
     phone: userData.Phone,
     addressStreet: userData.AddressStreet,
     addressNumber: userData.AddressNumber,
@@ -55,8 +55,10 @@ export async function registerUser(userData) {
     addressCity: userData.AddressCity,
     addressState: userData.AddressState,
     addressZip: userData.AddressZip,
-    password: userData.Senha,       // <- minúsculo e campo correto
+    Senha: userData.Senha || userData.password    // <- minúsculo e campo correto
   };
+
+  console.log("📦 Enviando payload:", payload);
 
   const res = await api.post("/auth/register", payload);
   return res.data;

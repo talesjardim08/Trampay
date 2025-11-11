@@ -14,17 +14,23 @@ var services = builder.Services;
 // -----------------------------
 // CONNECTION (MySQL)
 // -----------------------------
-var connStr = configuration.GetConnectionString("DefaultConnection")
-              ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
-              ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=YOUR_USER;Password=YOUR_PASS;";
+var connStr =
+    configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
+    ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=trampay_dev;Password=Tj120408@;";
 
-// disponibiliza IDbConnection (se o projeto usa Dapper / conexões manuais)
+// Registrar conexão MySQL (usado pelo Dapper)
 services.AddTransient<IDbConnection>(_ => new MySqlConnection(connStr));
+
+Console.WriteLine($"[INIT] Conectando ao banco: {connStr.Split(';')[0]}...");
 
 // -----------------------------
 // JWT / Authentication
 // -----------------------------
-var jwtSecret = configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "troque-essa-chave-por-uma-segura";
+var jwtSecret = configuration["Jwt:Secret"]
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET")
+    ?? "troque-essa-chave-por-uma-segura";
+
 var jwtIssuer = configuration["Jwt:Issuer"] ?? "Trampay";
 var jwtAudience = configuration["Jwt:Audience"] ?? "TrampayAudience";
 var keyBytes = Encoding.ASCII.GetBytes(jwtSecret);
@@ -52,23 +58,20 @@ services.AddAuthentication(options =>
 });
 
 // -----------------------------
-// Application services - registre AQUI (antes do Build)
+// Application Services
+// -----------------------------
 services.AddScoped<TrampayBackend.Services.IAuthService, TrampayBackend.Services.AuthService>();
 
-// registrar EmailService se existir (mantive a sua referência)
-if (Type.GetType("TrampayBackend.Services.EmailService, TrampayBackend") != null)
-{
-   services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
-
-}
 if (Type.GetType("TrampayBackend.Services.EmailService, TrampayBackend") != null)
 {
     services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
-
 }
 
+// -----------------------------
 // Controllers, CORS, Swagger
+// -----------------------------
 services.AddControllers();
+
 services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", p =>
@@ -97,16 +100,11 @@ services.AddSwaggerGen(c =>
     });
 });
 
-// permitir upload grandes (configurar antes do Build)
+// permitir uploads grandes
 services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
 });
-
-// registrar AuthService e EmailService (antes do Build)
-builder.Services.AddSingleton<TrampayBackend.Services.IAuthService, TrampayBackend.Services.AuthService>();
-builder.Services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
-
 
 // -----------------------------
 // Build
@@ -127,7 +125,7 @@ else
     app.UseExceptionHandler("/error");
 }
 
-// static uploads folder
+// Static uploads folder
 var uploads = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
 if (!Directory.Exists(uploads)) Directory.CreateDirectory(uploads);
 
@@ -143,21 +141,20 @@ app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// custom error middleware (mantive sua chamada, se não existir ignore)
 try
 {
     app.UseMiddleware<ErrorHandlerMiddleware>();
 }
 catch
 {
-    // se o middleware não existir, seguimos em frente
+    Console.WriteLine("⚠️ Middleware ErrorHandler não encontrado, ignorando...");
 }
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow }));
 
 // -----------------------------
-// Seed admin (opcional) - usa seu IUserService se disponível
+// Seed admin (opcional)
 // -----------------------------
 using (var scope = app.Services.CreateScope())
 {
@@ -167,7 +164,7 @@ using (var scope = app.Services.CreateScope())
         try
         {
             var admin = await auth.AuthenticateAsync("admin@oxente.com", "oxente123");
-            if (!admin.Success) // 👈 correção principal
+            if (!admin.Success)
             {
                 var newAdmin = new TrampayBackend.Models.User
                 {
@@ -183,16 +180,16 @@ using (var scope = app.Services.CreateScope())
                 };
 
                 await auth.RegisterAsync(newAdmin, "oxente123");
-                Console.WriteLine("Usuário admin criado com sucesso!");
+                Console.WriteLine("✅ Usuário admin criado com sucesso!");
             }
             else
             {
-                Console.WriteLine("Usuário admin já existe ou login bem-sucedido.");
+                Console.WriteLine("ℹ️ Usuário admin já existe ou login bem-sucedido.");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao criar admin: {ex.Message}");
+            Console.WriteLine($"❌ Erro ao criar admin: {ex.Message}");
         }
     }
 }
