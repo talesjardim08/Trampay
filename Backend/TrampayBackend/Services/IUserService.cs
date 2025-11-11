@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using TrampayBackend.Models;
 
 public interface IUserService
 {
