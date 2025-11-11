@@ -72,7 +72,7 @@ export default function CreateAccountScreen({ navigation }) {
         DocumentType: form.accountType === 'pf' ? 'CPF' : 'CNPJ',
         DocumentNumber: form.documentNumber,
         LegalName: form.legalName,
-        DisplayName: form.displayName,
+        DisplayName: form.displayName || form.legalName,
         BirthDate: null,
         Email: form.email,
         Phone: form.phone,
@@ -83,7 +83,7 @@ export default function CreateAccountScreen({ navigation }) {
         AddressCity: form.addressCity,
         AddressState: form.addressState,
         AddressZip: null,
-        Senha: form.password,
+        password: form.password,
       };
 
 

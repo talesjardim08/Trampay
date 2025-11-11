@@ -56,29 +56,23 @@ namespace TrampayBackend.Controllers
         }
 
         // ---------- REGISTER
-        [HttpPost("register")]
+       [HttpPost("register")]
 public async Task<IActionResult> Register([FromBody] JsonElement body)
 {
     try
     {
         string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
         string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
-        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber");
-        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name");
+        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "00000000000";
+        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "Usuário";
         string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName") ?? legalName;
         string email = GetString(body, "Email") ?? GetString(body, "email");
-        string phone = GetString(body, "Phone") ?? GetString(body, "phone");
+        string phone = GetString(body, "Phone") ?? GetString(body, "phone") ?? "00000000000";
         string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
 
-        // 🔒 Verificações obrigatórias
+        // 🚨 Campos obrigatórios
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
             return BadRequest(new { error = "Email e senha são obrigatórios." });
-
-        if (string.IsNullOrWhiteSpace(documentNumber))
-            return BadRequest(new { error = "Número de documento é obrigatório." });
-
-        if (string.IsNullOrWhiteSpace(legalName))
-            return BadRequest(new { error = "Nome completo ou razão social é obrigatório." });
 
         // 🔍 Checa duplicação de e-mail
         var exists = await _db.QueryFirstOrDefaultAsync<int?>(
@@ -87,15 +81,15 @@ public async Task<IActionResult> Register([FromBody] JsonElement body)
         if (exists != null)
             return BadRequest(new { error = "Email já cadastrado." });
 
-        // 🔑 Gera hash da senha
+        // 🔐 Hash seguro da senha
         var hash = BCrypt.Net.BCrypt.HashPassword(senha);
 
-        // ✅ Insere o novo usuário
+        // ✅ Insert compatível com o banco
         var insert = @"
             INSERT INTO users 
-              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, is_active, created_at)
+              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, is_active, is_verified, created_at)
             VALUES
-              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, 1, NOW());
+              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, 1, 1, NOW());
             SELECT LAST_INSERT_ID();";
 
         var id = await _db.ExecuteScalarAsync<long>(insert, new
@@ -110,18 +104,28 @@ public async Task<IActionResult> Register([FromBody] JsonElement body)
             PasswordHash = hash
         });
 
-        // Gera o JWT
+        // 🔑 Gera token JWT
         var token = GenerateJwt(id);
 
         return Ok(new
         {
             token,
-            user = new { id, email, legalName, displayName }
+            user = new
+            {
+                id,
+                email,
+                displayName,
+                legalName,
+                accountType,
+                documentType
+            }
         });
     }
     catch (Exception ex)
     {
-        return Problem(detail: ex.Message);
+        // Log mais detalhado no servidor
+        Console.WriteLine($"[REGISTER ERROR] {ex.Message}");
+        return Problem(detail: ex.Message, title: "Erro interno ao registrar usuário");
     }
 }
 
