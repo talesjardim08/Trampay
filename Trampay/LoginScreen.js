@@ -16,8 +16,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import { MaterialIcons } from "@expo/vector-icons";
-import { loginUser } from "./components/authService"; 
-import { colors, spacing, fonts } from "./styles"; 
+import { login } from "./authService"; 
+import { colors, spacing, fonts } from "./styles";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -30,28 +30,22 @@ export default function LoginScreen({ navigation }) {
     Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
   }, []);
 
-  const handleLogin = async () => {
-    if (!email || !senha) return Alert.alert("Atenção", "Preencha e-mail e senha");
-
-    setLoading(true);
+   async function handleLogin() {
+    if (!email || !senha) {
+      Alert.alert('Erro', 'Preencha email e senha');
+      return;
+    }
     try {
-      const res = await loginUser({ Email: email.trim(), Senha: senha });
-
-      if (res.token) {
-        await SecureStore.setItemAsync("token", res.token);
-        await SecureStore.setItemAsync("user", JSON.stringify(res.user));
-        Alert.alert("Sucesso", "Login realizado com sucesso!");
-        navigation.replace("Home");
-      } else {
-        Alert.alert("Erro", res.message || "Credenciais inválidas");
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert("Erro", "Falha ao autenticar. Verifique sua conexão.");
+      setLoading(true);
+      await login(email, senha);
+      navigation.replace('Home');
+    } catch (err) {
+      console.log('Erro de login:', err.response?.data || err.message);
+      Alert.alert('Erro', err.response?.data?.error || 'Falha ao entrar');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }}>

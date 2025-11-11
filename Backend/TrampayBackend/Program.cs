@@ -1,88 +1,34 @@
-using System.Text;
+using System.Data;
+using MySqlConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Microsoft.OpenApi.Models;
+using TrampayBackend.Middleware;
+
 
 var builder = WebApplication.CreateBuilder(args);
-var config = builder.Configuration;
+var configuration = builder.Configuration;
+var services = builder.Services;
 
-// --------------------------------------------------------------------
-// 🔹 Configuração da porta (Render usa a variável PORT para o binding)
-// --------------------------------------------------------------------
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+// ------------------------------------------------------
+// CONFIGURAÇÕES DO BANCO DE DADOS
+// ------------------------------------------------------
+var connStr = configuration.GetConnectionString("Default")
+              ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default")
+              ?? "Server=127.0.0.1;Port=3306;Database=trampay_tcc;Uid=root;Pwd=root;";
 
-// --------------------------------------------------------------------
-// 🔹 Services
-// --------------------------------------------------------------------
-// ✅ Aqui adicionamos o suporte para propriedades case-insensitive no JSON
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-    });
+services.AddTransient<IDbConnection>(_ => new MySqlConnection(connStr));
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Trampay API",
-        Version = "v1",
-        Description = "API de autenticação e usuários do app Trampay"
-    });
-
-    // Configuração do esquema JWT no Swagger
-    var jwtSecurityScheme = new OpenApiSecurityScheme
-    {
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Description = "Informe o token JWT no formato: Bearer {token}",
-        Reference = new OpenApiReference
-        {
-            Id = JwtBearerDefaults.AuthenticationScheme,
-            Type = ReferenceType.SecurityScheme
-        }
-    };
-
-    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        { jwtSecurityScheme, Array.Empty<string>() }
-    });
-});
-
-// --------------------------------------------------------------------
-// 🔹 Injeção de dependências
-// --------------------------------------------------------------------
-builder.Services.AddScoped<IUserService, UserService>();
-
-// --------------------------------------------------------------------
-// 🔹 JWT
-// --------------------------------------------------------------------
-
-// ⚠️ No Render, as variáveis devem estar assim:
-// JWT_KEY=chave-super-secreta
-// JWT_ISSUER=TrampayApi
-// JWT_AUDIENCE=TrampayApp
-var jwtKey = config["Jwt:Key"]
-          ?? Environment.GetEnvironmentVariable("JWT_KEY")
-          ?? "change_this_in_prod";
-
-var issuer = config["Jwt:Issuer"]
-          ?? Environment.GetEnvironmentVariable("JWT_ISSUER")
-          ?? "TrampayApi";
-
-var audience = config["Jwt:Audience"]
-          ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE")
-          ?? "TrampayApp";
-
+// ------------------------------------------------------
+// CONFIGURAÇÕES JWT
+// ------------------------------------------------------
+var jwtKey = configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("Jwt__Key") ?? "troquesecreta_dev_mude";
+var jwtIssuer = configuration["Jwt:Issuer"] ?? "trampay.local";
+var jwtAudience = configuration["Jwt:Audience"] ?? "trampay.local";
 var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
 
-builder.Services.AddAuthentication(options =>
+services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -93,49 +39,95 @@ builder.Services.AddAuthentication(options =>
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer,
-        ValidAudience = audience,
         IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(2)
     };
 });
 
-// --------------------------------------------------------------------
-// 🔹 CORS (para o app React Native Expo acessar o backend no Render)
-// --------------------------------------------------------------------
-builder.Services.AddCors(options =>
+// ------------------------------------------------------
+// CONFIGURAÇÕES CORS E SWAGGER
+// ------------------------------------------------------
+services.AddCors(o => o.AddPolicy("FrontendPolicy", p =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    p.AllowAnyHeader()
+     .AllowAnyMethod()
+     .AllowAnyOrigin(); // Em produção, troque por .WithOrigins("https://seu-front.render.com")
+}));
+
+services.AddEndpointsApiExplorer();
+services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Trampay API", Version = "v1" });
+
+    var jwtScheme = new OpenApiSecurityScheme
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Autenticação JWT (Bearer token)"
+    };
+
+    c.AddSecurityDefinition("Bearer", jwtScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { jwtScheme, Array.Empty<string>() }
     });
 });
 
-// --------------------------------------------------------------------
-// 🔹 Construção do app
-// --------------------------------------------------------------------
+services.AddControllers();
+
 var app = builder.Build();
 
-// 🔹 Habilitar Swagger também em produção
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// registrar EmailService
+services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
+
+// permitir form file large uploads (ajuste se necessário)
+services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Trampay API v1");
+    options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
 });
 
-// 🔹 Middleware
+
+// ------------------------------------------------------
+// PIPELINE
+// ------------------------------------------------------
 app.UseRouting();
-app.UseCors("AllowAll");
+
+app.UseErrorHandler(); // middleware global - coloque antes de outras middlewares
+
+
+app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 🔹 Mapear controllers
-app.MapControllers();
+// Permitir upload e servir arquivos estáticos
+var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+if (!Directory.Exists(uploadsDir))
+    Directory.CreateDirectory(uploadsDir);
 
-// 🔹 Rodar o app
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads"
+});
+
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow }));
+
 app.Run();
