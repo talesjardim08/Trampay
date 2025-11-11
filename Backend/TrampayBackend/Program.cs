@@ -15,7 +15,13 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 // --------------------------------------------------------------------
 // 🔹 Services
 // --------------------------------------------------------------------
-builder.Services.AddControllers();
+// ✅ Aqui adicionamos o suporte para propriedades case-insensitive no JSON
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
