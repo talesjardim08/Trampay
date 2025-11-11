@@ -1,6 +1,8 @@
+using System.Threading.Tasks;
+
 namespace TrampayBackend.Services
 {
-     public interface IEmailService
+    public interface IEmailService
     {
         Task SendEmailAsync(string toEmail, string subject, string body);
     }

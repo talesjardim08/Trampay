@@ -6,32 +6,28 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using TrampayBackend.Middleware;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
-// Use builder.Services (evitar modificar app.Services após Build)
 var services = builder.Services;
 
-// ---------------------------
-// Connection string (MySQL)
-// ---------------------------
-// Preferir variável de ambiente "MYSQL_CONNECTION" ou ConnectionStrings:DefaultConnection
+// -----------------------------
+// CONNECTION (MySQL)
+// -----------------------------
 var connStr = configuration.GetConnectionString("DefaultConnection")
-           ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
-           ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=YOUR_USER;Password=YOUR_PASS;";
+              ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
+              ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=YOUR_USER;Password=YOUR_PASS;";
 
-// ---------------------------
-// Registros de serviços (todos ANTES do Build)
-// ---------------------------
-
-// DB connection factory (se seu código usa IDbConnection diretamente)
+// disponibiliza IDbConnection (se o projeto usa Dapper / conexões manuais)
 services.AddTransient<IDbConnection>(_ => new MySqlConnection(connStr));
 
-// Authentication - JWT (exemplo mínimo; ajuste issuer/secret conforme necessário)
+// -----------------------------
+// JWT / Authentication
+// -----------------------------
 var jwtSecret = configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "troque-essa-chave-por-uma-segura";
-var jwtIssuer = configuration["Jwt:Issuer"] ?? "TrampayBackend";
-var key = Encoding.ASCII.GetBytes(jwtSecret);
+var jwtIssuer = configuration["Jwt:Issuer"] ?? "Trampay";
+var jwtAudience = configuration["Jwt:Audience"] ?? "TrampayAudience";
+var keyBytes = Encoding.ASCII.GetBytes(jwtSecret);
 
 services.AddAuthentication(options =>
 {
@@ -45,70 +41,76 @@ services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false,
+        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(2)
     };
 });
 
-// CORS - permitir frontend (ajuste conforme seu domínio)
-services.AddCors(o => o.AddPolicy("FrontendPolicy", p =>
-{
-    p.AllowAnyHeader()
-     .AllowAnyMethod()
-     .AllowAnyOrigin();
-}));
+// -----------------------------
+// Application services - registre AQUI (antes do Build)
+services.AddScoped<TrampayBackend.Services.IAuthService, TrampayBackend.Services.AuthService>();
 
-// Swagger / OpenAPI
-services.AddEndpointsApiExplorer();
-services.AddSwaggerGen(c =>
+// registrar EmailService se existir (mantive a sua referência)
+if (Type.GetType("TrampayBackend.Services.EmailService, TrampayBackend") != null)
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Trampay API", Version = "v1" });
-    // JWT auth in swagger (opcional)
-    var securityScheme = new OpenApiSecurityScheme
+   services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
+
+}
+if (Type.GetType("TrampayBackend.Services.EmailService, TrampayBackend") != null)
+{
+    services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
+
+}
+
+// Controllers, CORS, Swagger
+services.AddControllers();
+services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", p =>
     {
-        Name = "Authorization",
-        Description = "Enter JWT Bearer token **_only_**",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-    };
-    c.AddSecurityDefinition("Bearer", securityScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
-        { securityScheme, new string[] { } }
+        p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin();
     });
 });
 
-// Controllers
-services.AddControllers();
-
-// Se seu projeto tem IEmailService/EmailService, registrar aqui (antes do Build)
-services.AddSingleton<TrampayBackend.Services.IEmailService, TrampayBackend.Services.EmailService>();
-
-// Configurar FormOptions para upload (se usa upload multipart grande)
-services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+services.AddEndpointsApiExplorer();
+services.AddSwaggerGen(c =>
 {
-    options.MultipartBodyLengthLimit = 1024 * 1024 * 200; // 200 MB (ajuste)
-    options.BufferBody = false;
+    var jwtScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Insira 'Bearer {token}'"
+    };
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Trampay API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", jwtScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { jwtScheme, Array.Empty<string>() }
+    });
 });
 
-// Qualquer outro service registration que seu projeto precisar:
- // services.AddScoped<...>();
- // services.AddTransient<...>();
- // services.AddHttpClient();
+// permitir upload grandes (configurar antes do Build)
+services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
+});
 
-
-// ---------------------------
-// Agora construímos o app (Build)
-// ---------------------------
+// -----------------------------
+// Build
+// -----------------------------
 var app = builder.Build();
 
-
-// ---------------------------
-// Middlewares (após Build)
-// ---------------------------
+// -----------------------------
+// Middleware / Pipeline
+// -----------------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -117,32 +119,73 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // Em produção, você pode querer um handler de erros customizado
     app.UseExceptionHandler("/error");
 }
 
-// Habilitar CORS, Auth e Authorization
+// static uploads folder
+var uploads = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+if (!Directory.Exists(uploads)) Directory.CreateDirectory(uploads);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploads),
+    RequestPath = "/uploads"
+});
+
+app.UseRouting();
+
 app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Registrar middleware global de erros se você tiver (referência do seu projeto)
-app.UseMiddleware<ErrorHandlerMiddleware>();
-app.UseErrorHandler(); // se essa extensão existir no seu projeto
-
-// Permitir upload e servir arquivos estáticos
-var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
-if (!Directory.Exists(uploadsDir))
-    Directory.CreateDirectory(uploadsDir);
-
-app.UseStaticFiles(new StaticFileOptions
+// custom error middleware (mantive sua chamada, se não existir ignore)
+try
 {
-    FileProvider = new PhysicalFileProvider(uploadsDir),
-    RequestPath = "/uploads"
-});
+    app.UseMiddleware<ErrorHandlerMiddleware>();
+}
+catch
+{
+    // se o middleware não existir, seguimos em frente
+}
 
-// Mapear controllers e endpoints
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow }));
+
+// -----------------------------
+// Seed admin (opcional) - usa seu IUserService se disponível
+// -----------------------------
+using (var scope = app.Services.CreateScope())
+{
+    var auth = scope.ServiceProvider.GetService<TrampayBackend.Services.IAuthService>();
+    if (auth != null)
+    {
+        try
+        {
+            var admin = await auth.AuthenticateAsync("admin@oxente.com", "oxente123");
+            if (admin == null)
+            {
+                var newAdmin = new TrampayBackend.Models.User
+                {
+                    AccountType = "pf",
+                    DocumentType = "CPF",
+                    DocumentNumber = "00000000000",
+                    LegalName = "Admin Test",
+                    DisplayName = "Admin",
+                    Email = "admin@oxente.com",
+                    Phone = "0000000000",
+                    IsActive = true,
+                    IsVerified = true
+                };
+
+                await auth.RegisterAsync(newAdmin, "oxente123");
+            }
+        }
+        catch
+        {
+            // ignore seed errors
+        }
+    }
+}
+
 
 app.Run();
