@@ -57,57 +57,73 @@ namespace TrampayBackend.Controllers
 
         // ---------- REGISTER
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] JsonElement body)
+public async Task<IActionResult> Register([FromBody] JsonElement body)
+{
+    try
+    {
+        string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
+        string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
+        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber");
+        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name");
+        string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName") ?? legalName;
+        string email = GetString(body, "Email") ?? GetString(body, "email");
+        string phone = GetString(body, "Phone") ?? GetString(body, "phone");
+        string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
+
+        // 🔒 Verificações obrigatórias
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
+            return BadRequest(new { error = "Email e senha são obrigatórios." });
+
+        if (string.IsNullOrWhiteSpace(documentNumber))
+            return BadRequest(new { error = "Número de documento é obrigatório." });
+
+        if (string.IsNullOrWhiteSpace(legalName))
+            return BadRequest(new { error = "Nome completo ou razão social é obrigatório." });
+
+        // 🔍 Checa duplicação de e-mail
+        var exists = await _db.QueryFirstOrDefaultAsync<int?>(
+            "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
+
+        if (exists != null)
+            return BadRequest(new { error = "Email já cadastrado." });
+
+        // 🔑 Gera hash da senha
+        var hash = BCrypt.Net.BCrypt.HashPassword(senha);
+
+        // ✅ Insere o novo usuário
+        var insert = @"
+            INSERT INTO users 
+              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, is_active, created_at)
+            VALUES
+              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, 1, NOW());
+            SELECT LAST_INSERT_ID();";
+
+        var id = await _db.ExecuteScalarAsync<long>(insert, new
         {
-            try
-            {
-                string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
-                string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
-                string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "";
-                string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "";
-                string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName");
-                string email = GetString(body, "Email") ?? GetString(body, "email");
-                string phone = GetString(body, "Phone") ?? GetString(body, "phone");
-                string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
+            AccountType = accountType,
+            DocumentType = documentType,
+            DocumentNumber = documentNumber,
+            LegalName = legalName,
+            DisplayName = displayName,
+            Email = email,
+            Phone = phone,
+            PasswordHash = hash
+        });
 
-                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
-                    return BadRequest(new { error = "Email e senha são obrigatórios" });
+        // Gera o JWT
+        var token = GenerateJwt(id);
 
-                var exists = await _db.QueryFirstOrDefaultAsync<int?>(
-                    "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
-
-                if (exists != null)
-                    return BadRequest(new { error = "Email já cadastrado" });
-
-                var hash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-                var insert = @"
-                    INSERT INTO users 
-                      (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, created_at)
-                    VALUES
-                      (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, NOW());
-                    SELECT LAST_INSERT_ID();";
-
-                var id = await _db.ExecuteScalarAsync<long>(insert, new
-                {
-                    AccountType = accountType,
-                    DocumentType = documentType,
-                    DocumentNumber = documentNumber,
-                    LegalName = legalName,
-                    DisplayName = displayName,
-                    Email = email,
-                    Phone = phone,
-                    PasswordHash = hash
-                });
-
-                var token = GenerateJwt(id);
-                return Ok(new { token, user = new { id, email } });
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message);
-            }
-        }
+        return Ok(new
+        {
+            token,
+            user = new { id, email, legalName, displayName }
+        });
+    }
+    catch (Exception ex)
+    {
+        return Problem(detail: ex.Message);
+    }
+}
 
         // ---------- Helpers ----------
         private string GenerateJwt(long userId)
