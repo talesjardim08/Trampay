@@ -1,0 +1,6 @@
+modules = ["nodejs-20", "dotnet-7.0", "dotnet-8.0"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
