@@ -1,5 +1,5 @@
 // Trampay/services/ServicesService.js
-import api from "./api";
+import api from "./services/api";
 
 export async function listServices(params = {}) {
   // params: { ownerId, page, perPage }

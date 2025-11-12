@@ -20,7 +20,7 @@ builder.Services.AddTransient<AiService>();
 var connStr =
     configuration.GetConnectionString("DefaultConnection")
     ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION")
-    ?? "Server=mysql-trampay.alwaysdata.net;Database=trampay_tcc;User=trampay_dev;Password=Tj120408@;";
+    ?? "Server=localhost;Database=trampay_tcc;User=root;Password=;Connection Timeout=5;";
 
 // Registrar conexão MySQL (usado pelo Dapper)
 services.AddTransient<IDbConnection>(_ => new MySqlConnection(connStr));
@@ -159,42 +159,45 @@ app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow })
 // -----------------------------
 // Seed admin (opcional)
 // -----------------------------
-using (var scope = app.Services.CreateScope())
-{
-    var auth = scope.ServiceProvider.GetService<TrampayBackend.Services.IAuthService>();
-    if (auth != null)
-    {
-        try
-        {
-            var admin = await auth.AuthenticateAsync("admin@oxente.com", "oxente123");
-            if (!admin.Success)
-            {
-                var newAdmin = new TrampayBackend.Models.User
-                {
-                    AccountType = "pf",
-                    DocumentType = "CPF",
-                    DocumentNumber = "00000000000",
-                    LegalName = "Admin Test",
-                    DisplayName = "Admin",
-                    Email = "admin@oxente.com",
-                    Phone = "0000000000",
-                    IsActive = true,
-                    IsVerified = true
-                };
+// Database seeding disabled for import - connect a database and set SeedAdminOnStartup=true to enable
+Console.WriteLine("ℹ️  Admin seeding disabled. Configure database connection and set SeedAdminOnStartup=true to enable.");
 
-                await auth.RegisterAsync(newAdmin, "oxente123");
-                Console.WriteLine("✅ Usuário admin criado com sucesso!");
-            }
-            else
-            {
-                Console.WriteLine("ℹ️ Usuário admin já existe ou login bem-sucedido.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Erro ao criar admin: {ex.Message}");
-        }
-    }
-}
+// using (var scope = app.Services.CreateScope())
+// {
+//     var auth = scope.ServiceProvider.GetService<TrampayBackend.Services.IAuthService>();
+//     if (auth != null)
+//     {
+//         try
+//         {
+//             var admin = await auth.AuthenticateAsync("admin@oxente.com", "oxente123");
+//             if (!admin.Success)
+//             {
+//                 var newAdmin = new TrampayBackend.Models.User
+//                 {
+//                     AccountType = "pf",
+//                     DocumentType = "CPF",
+//                     DocumentNumber = "00000000000",
+//                     LegalName = "Admin Test",
+//                     DisplayName = "Admin",
+//                     Email = "admin@oxente.com",
+//                     Phone = "0000000000",
+//                     IsActive = true,
+//                     IsVerified = true
+//                 };
+// 
+//                 await auth.RegisterAsync(newAdmin, "oxente123");
+//                 Console.WriteLine("✅ Usuário admin criado com sucesso!");
+//             }
+//             else
+//             {
+//                 Console.WriteLine("ℹ️ Usuário admin já existe ou login bem-sucedido.");
+//             }
+//         }
+//         catch (Exception ex)
+//         {
+//             Console.WriteLine($"❌ Erro ao criar admin: {ex.Message}");
+//         }
+//     }
+// }
 
 app.Run();

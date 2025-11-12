@@ -1,5 +1,5 @@
 // Trampay/services/TransactionsService.js
-import api from "./api";
+import api from "./services/api";
 
 export async function listTransactions(query = {}) {
   const q = new URLSearchParams(query).toString();

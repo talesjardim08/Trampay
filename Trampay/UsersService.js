@@ -1,5 +1,5 @@
 // Trampay/UsersService.js
-import api from "./api";
+import api from "./services/api";
 
 export async function getProfile() {
   const resp = await api.get("/auth/me");

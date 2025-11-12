@@ -1,5 +1,5 @@
 // Trampay/services/SchedulesService.js
-import api from "../api";
+import api from "./services/api";
 
 export async function listSchedules(params = {}) {
   const q = new URLSearchParams(params).toString();

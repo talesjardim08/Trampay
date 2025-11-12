@@ -1,8 +1,7 @@
 // src/screens/AssineProScreen.js
 import React, { useContext, useState } from 'react';
 import { View, Text, Button, Alert, StyleSheet } from 'react-native';
-import api from '../api';
-import api from "../authService";
+import api from '../services/api';
 
 const AssineProScreen = ({ navigation }) => {
   const { user, setUser } = useContext(AuthContext);
