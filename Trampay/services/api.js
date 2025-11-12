@@ -3,7 +3,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+// Use produção do Render ou localhost (dev)
+const API_BASE = process.env.REACT_APP_API_URL || 'https://trampay.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
