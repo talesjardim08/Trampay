@@ -6,8 +6,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // ---------------------------------------------
 // 🔧 Configuração da API
 // ---------------------------------------------
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+
 const api = axios.create({
-  baseURL: "https://trampay.onrender.com/api",
+  baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
 });
 
