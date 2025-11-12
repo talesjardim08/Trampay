@@ -3,6 +3,7 @@ import React, { createContext, useState, useEffect } from "react";
 import * as SecureStore from "expo-secure-store";
 import { getUserProfile, login, logout, registerUser } from "./authService";
 import { Alert } from "react-native";
+import api from "./services/api";
 
 // ---------------------------------------------
 // 🧭 Contexto de Autenticação
@@ -114,7 +115,6 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      const api = require('./services/api').default;
       const response = await api.post('/subscription/activate');
       
       if (response.data.success) {

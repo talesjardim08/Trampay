@@ -170,3 +170,70 @@ Preferred communication style: Simple, everyday language.
 2. Stock, Clients, Equipments stored locally - backend endpoints not connected
 3. Premium features (IA, Trading) require backend subscription check not fully implemented
 4. Image upload (equipment/stock photos) uses local storage, no cloud integration
+---
+
+## Recent Changes (12/11/2025)
+
+### Integração Completa Frontend + Backend Render
+
+**Configuração da API:**
+- Frontend agora usa `https://trampay.onrender.com/api` (backend em produção)
+- Configurado em: `services/api.js` e `authService.js`
+
+**Bug Crítico Corrigido:**
+- Token storage mismatch resolvido (agora usa SecureStore consistentemente)
+- Todas APIs autenticadas funcionando (perfil, PRO, IA)
+
+**AuthContext Melhorado:**
+- Carregamento automático de perfil do usuário
+- Status premium (`isPro`) sincronizado com backend
+- `activatePro()`: integrado com `/api/subscription/activate`
+- `setUser()`: exportado para atualizações de perfil
+- Logout completo: limpa SecureStore + AsyncStorage
+
+**Telas Implementadas:**
+1. **IAScreen** (nova): Chat com IA + OCR de imagens
+   - Histórico salvo em `ai_chats` e `ai_messages`
+   - Verificação de assinatura PRO
+   - Interface completa com bubbles e loading states
+
+2. **AssineProScreen** (reescrita): Ativação de PRO
+   - Integrada com `/api/subscription/activate`
+   - Verifica se usuário já é PRO
+
+3. **EditProfileScreen** (integrada): Edição de perfil
+   - GET/PUT `/api/auth/profile`
+   - Edita: nome, email, telefone, senha
+
+**SideMenu (Drawer):**
+- Reescrito para usar AuthContext
+- Navegação PRO funcional (bloqueia e redireciona)
+- Layout corrigido e alinhado
+
+**Sistema de Bloqueio PRO:**
+- HOC `withPremiumProtection`: protege qualquer tela
+- Verificação automática de `isPro`
+- Redirecionamento para AssineProScreen
+
+**Backend:**
+- Criado `migration_ai_tables.sql` para tabelas de IA
+- Tabelas: `ai_chats`, `ai_messages`
+- **PENDENTE:** Executar SQL no AlwaysData (phpMyAdmin)
+
+**Arquivos Modificados:**
+- `Trampay/services/api.js`
+- `Trampay/authService.js`
+- `Trampay/AuthContext.js`
+- `Trampay/routes.js`
+- `Trampay/components/SideMenu.js`
+- `Trampay/screens/AssineProScreen.js`
+- `Trampay/screens/IAScreen.js` (novo)
+- `Trampay/screens/EditProfileScreen.js`
+- `Trampay/screens/hocs/withPremiumProtection.js`
+- `Backend/migration_ai_tables.sql` (novo)
+
+**Próximas Ações Necessárias:**
+1. Executar SQL das tabelas de IA no AlwaysData
+2. Testar backend no Render (https://trampay.onrender.com/health)
+3. Testar fluxo completo: login → perfil → PRO → IA
+4. Fazer commit e push para GitHub

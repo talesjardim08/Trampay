@@ -1,5 +1,5 @@
-// Side Menu do Trampay — versão completa e integrada
-import React, { useEffect, useState } from 'react';
+// Side Menu do Trampay — integrado com AuthContext
+import React, { useContext } from 'react';
 import {
   View,
   Text,
@@ -10,35 +10,12 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
-import api from '../services/api'; // Usa o backend .NET (ajusta a baseURL se necessário)
+import { AuthContext } from '../AuthContext';
 
-const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
-  const [user, setUser] = useState(initialUser);
-  const [loading, setLoading] = useState(true);
-
-  // 🔗 Buscar dados reais do usuário no backend
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) return;
-
-        const res = await api.get('/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        setUser(res.data);
-      } catch (err) {
-        console.error('Erro ao buscar dados do usuário:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
+const SideMenu = ({ navigation, onClose }) => {
+  const { user, isPro, loading, handleLogout } = useContext(AuthContext);
 
   // ⚠️ Bloqueia acesso às telas Premium se o usuário não for assinante
   const handleNavigation = (screen) => {
@@ -48,11 +25,12 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
       'CryptoTrading',
       'StocksTrading',
       'CurrencyTrading',
+      'Precificacao',
     ];
 
-    if (!user?.isPremium && premiumScreens.includes(screen)) {
+    if (!isPro && premiumScreens.includes(screen)) {
       if (onClose) onClose();
-      return navigation.navigate('SubscribePro');
+      return navigation.navigate('AssinePro');
     }
 
     if (onClose) onClose();
@@ -60,15 +38,15 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
   };
 
   // 🔒 Logout completo
-  const handleLogout = async () => {
+  const handleLogoutPress = async () => {
     Alert.alert('Confirmação', 'Você deseja mesmo sair?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Sair',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.clear();
-          if (onLogout) onLogout();
+          await handleLogout();
+          if (onClose) onClose();
           navigation.reset({
             index: 0,
             routes: [{ name: 'Login' }],
@@ -79,7 +57,7 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
   };
 
   const userName =
-    user?.name || user?.email?.split('@')[0] || 'Usuário';
+    user?.displayName || user?.legalName || user?.email?.split('@')[0] || 'Usuário';
 
   if (loading) {
     return (
@@ -106,7 +84,7 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
           <View style={styles.profileText}>
             <Text style={styles.greeting}>Olá,</Text>
             <Text style={styles.userName}>{userName}</Text>
-            {user?.isPremium && (
+            {isPro && (
               <Text style={styles.premiumBadge}>Usuário Premium ⭐</Text>
             )}
           </View>
@@ -135,7 +113,7 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
           onPress={() => handleNavigation('TrampayIA')}
         >
           <Text style={styles.menuItemText}>Trampay I.A</Text>
-          {!user?.isPremium && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
+          {!isPro && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -147,12 +125,12 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => handleNavigation('SubscribePro')}
+          onPress={() => handleNavigation('AssinePro')}
         >
-          <Text style={styles.menuItemText}>Assine o Pro</Text>
+          <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
           <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
         </TouchableOpacity>
       </View>
@@ -171,20 +149,22 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
             />
           </View>
           <Text style={styles.featureText}>Precificação</Text>
+          {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.featureCard, { backgroundColor: '#e0f2f1' }]}
-          onPress={() => handleNavigation('Services')}
+          onPress={() => handleNavigation('CambioTrading')}
         >
           <View style={styles.featureIcon}>
             <MaterialIcons
-              name="business-center"
+              name="trending-up"
               size={20}
               color={colors.primaryDark}
             />
           </View>
-          <Text style={styles.featureText}>Serviços</Text>
+          <Text style={styles.featureText}>Trading</Text>
+          {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
         </TouchableOpacity>
       </View>
 
@@ -200,7 +180,10 @@ const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background,
+  },
   header: {
     backgroundColor: colors.primaryDark,
     paddingHorizontal: spacing.lg,
@@ -209,7 +192,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  profileSection: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  profileSection: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1,
+  },
   profileIcon: {
     width: 50,
     height: 50,
@@ -227,17 +214,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileInitial: { fontSize: 18, fontFamily: fonts.bold, color: colors.primaryDark },
+  profileInitial: { 
+    fontSize: 18, 
+    fontFamily: fonts.bold, 
+    color: colors.primaryDark,
+  },
   profileText: { flex: 1 },
-  greeting: { color: colors.white, fontSize: 16, fontFamily: fonts.regular },
-  userName: { color: colors.white, fontSize: 18, fontFamily: fonts.bold },
+  greeting: { 
+    color: colors.white, 
+    fontSize: 16, 
+    fontFamily: fonts.regular,
+  },
+  userName: { 
+    color: colors.white, 
+    fontSize: 18, 
+    fontFamily: fonts.bold,
+  },
   premiumBadge: {
     color: '#ffcc00',
     fontSize: 12,
     fontFamily: fonts.medium,
     marginTop: 4,
   },
-  notificationIcon: { position: 'relative', padding: spacing.sm },
+  notificationIcon: { 
+    position: 'relative', 
+    padding: spacing.sm,
+  },
   notificationBadge: {
     position: 'absolute',
     top: spacing.sm,
@@ -249,13 +251,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.white,
   },
-  menuContainer: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  menuContainer: { 
+    paddingHorizontal: spacing.lg, 
+    paddingTop: spacing.lg,
+  },
   menuItem: {
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
   },
-  menuItemText: { fontSize: 16, fontFamily: fonts.medium, color: colors.text },
+  menuItemText: { 
+    fontSize: 16, 
+    fontFamily: fonts.medium, 
+    color: colors.text,
+  },
   lockedText: {
     fontSize: 12,
     color: colors.error,
@@ -266,7 +275,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    gap: spacing.md,
+    justifyContent: 'space-between',
   },
   featureCard: {
     flex: 1,
@@ -274,6 +283,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     minHeight: 100,
+    marginHorizontal: 4,
+    position: 'relative',
   },
   featureIcon: {
     width: 40,
@@ -289,6 +300,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     color: colors.primaryDark,
     textAlign: 'center',
+  },
+  lockedBadge: {
+    fontSize: 10,
+    color: colors.error,
+    fontFamily: fonts.bold,
+    marginTop: 4,
   },
   closeButton: {
     marginTop: 'auto',

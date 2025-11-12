@@ -253,8 +253,18 @@ const AppRoutes = ({
         />
         <Stack.Screen name="AdicionarTransacao" component={StubScreen} options={{ title: 'Adicionar Transação' }} />
         <Stack.Screen name="Logout" component={StubScreen} options={{ title: 'Logout' }} />
-        <Stack.Screen name="TrampayIA" component={StubScreen} options={{ title: 'Trampay I.A' }} />
-        <Stack.Screen name="SubscribePro" component={StubScreen} options={{ title: 'Assinar Pro' }} />
+        
+        {/* Telas PRO implementadas */}
+        <Stack.Screen 
+          name="TrampayIA" 
+          component={require('./screens/IAScreen').default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="AssinePro" 
+          component={require('./screens/AssineProScreen').default}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
