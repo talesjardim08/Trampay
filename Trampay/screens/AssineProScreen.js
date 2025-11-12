@@ -2,40 +2,32 @@
 import React, { useContext, useState } from 'react';
 import { View, Text, Button, Alert, StyleSheet } from 'react-native';
 import api from '../api';
-import { AuthContext } from '../context/AuthContext';
+import api from "../authService";
 
 const AssineProScreen = ({ navigation }) => {
   const { user, setUser } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
 
-  const activate = async () => {
-    setLoading(true);
-    try {
-      const res = await api.post('/subscription/activate');
-      if (res.data && res.data.success) {
-        // Atualiza info local do usuário
-        const updated = { ...user, is_premium: 1, premium_until: res.data.premium_until };
-        setUser(updated);
-        await AsyncStorage?.setItem('@trampay_user', JSON.stringify(updated));
-        Alert.alert('Sucesso', 'Sua conta agora é PRO!');
-        navigation.goBack();
-      } else {
-        Alert.alert('Erro', 'Não foi possível ativar PRO.');
-      }
-    } catch (e) {
-      console.warn(e);
-      Alert.alert('Erro', 'Falha ao ativar PRO.');
-    } finally {
-      setLoading(false);
+  const handleActivatePro = async () => {
+  try {
+    const res = await api.post("/subscription/activate");
+    if (res.status === 200) {
+      Alert.alert("Sucesso!", "Você agora é um usuário Premium!");
+      const user = await api.get("/users/me");
+      await AsyncStorage.setItem("userProfile", JSON.stringify(user.data));
     }
-  };
+  } catch (err) {
+    console.error("Erro ao ativar Pro:", err);
+    Alert.alert("Erro", "Não foi possível ativar sua assinatura agora.");
+  }
+};
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Assine Trampay PRO</Text>
       <Text style={styles.subtitle}>Desbloqueie IA, Precificação, Câmbio e Trading.</Text>
       <View style={{ marginTop: 20 }}>
-        <Button title={loading ? 'Aguarde...' : 'Quero ser Premium'} onPress={activate} disabled={loading} />
+        <Button title={loading ? 'Aguarde...' : 'Quero ser Premium'} onPress={handleActivatePro} disabled={loading} />
       </View>
     </View>
   );

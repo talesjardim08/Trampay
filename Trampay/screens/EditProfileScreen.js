@@ -32,7 +32,7 @@ const EditProfileScreen = ({ navigation, user }) => {
     loadProfileData();
   }, []);
 
-  const loadProfileData = async () => {
+  const loadProfileDatas = async () => {
     try {
       const savedProfile = await AsyncStorage.getItem('userProfile');
       if (savedProfile) {
@@ -52,49 +52,82 @@ const EditProfileScreen = ({ navigation, user }) => {
     }
   };
 
-  const handleSave = async () => {
-    if (!formData.name || !formData.email) {
-      Alert.alert('Erro', 'Nome e email são obrigatórios.');
+  const loadProfileData = async () => {
+  try {
+    // tenta carregar do backend
+    const serverProfile = await getProfile();
+    if (serverProfile) {
+      setFormData({
+        name: serverProfile.displayName || serverProfile.legalName || '',
+        email: serverProfile.email || '',
+        phone: serverProfile.phone || '',
+        password: ''
+      });
+      setProfileImage(serverProfile.profileImage || null); // se existir coluna
+      await AsyncStorage.setItem('userProfile', JSON.stringify(serverProfile));
       return;
     }
+  } catch (e) {
+    console.warn("Não foi possível carregar perfil do servidor, usando cache local.", e);
+  }
 
-    setIsLoading(true);
-    
-    try {
-      // Salva dados reais no AsyncStorage
-      const profileData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        profileImage: profileImage,
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Inclui senha apenas se foi alterada
-      if (formData.password) {
-        profileData.password = formData.password; // Em produção seria hasheada
-      }
-      
-      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
-      console.log('Perfil salvo com sucesso:', profileData);
-      
-      Alert.alert(
-        'Sucesso!',
-        'Seus dados foram salvos permanentemente!',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack()
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
-      Alert.alert('Erro', 'Erro ao salvar dados. Tente novamente.');
-    } finally {
-      setIsLoading(false);
+  // fallback para cache local
+  const savedProfile = await AsyncStorage.getItem('userProfile');
+  if (savedProfile) {
+    const profile = JSON.parse(savedProfile);
+    setFormData({
+      name: profile.displayName || profile.name || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      password: ''
+    });
+    setProfileImage(profile.profileImage || null);
+  }
+};
+
+const handleSave = async () => {
+  if (!formData.name || !formData.email) {
+    Alert.alert('Erro', 'Nome e email são obrigatórios.');
+    return;
+  }
+  setIsLoading(true);
+  try {
+    // Pega id do token ou do cache local. Supondo que token contenha id no JWT ou que userProfile tenha id
+    const saved = await AsyncStorage.getItem('userProfile');
+    let userId = null;
+    if (saved) {
+      try { userId = JSON.parse(saved).id; } catch {}
     }
-  };
+
+    // Se não tem id, tenta buscar do GET /users/me
+    if (!userId) {
+      const serverProfile = await getProfile();
+      userId = serverProfile?.id;
+    }
+
+    if (!userId) {
+      throw new Error("ID do usuário não encontrado");
+    }
+
+    const payload = {
+      email: formData.email,
+      displayName: formData.name,
+      phone: formData.phone,
+      password: formData.password ? formData.password : undefined
+    };
+
+    const updated = await updateProfile(userId, payload);
+
+    // atualiza cache local
+    await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
+    Alert.alert('Sucesso!', 'Seus dados foram atualizados.');
+  } catch (err) {
+    console.error("Erro ao atualizar perfil:", err);
+    Alert.alert('Erro', 'Não foi possível atualizar seu perfil. Tente novamente.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({

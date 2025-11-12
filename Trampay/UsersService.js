@@ -1,13 +1,12 @@
-// Trampay/services/UsersService.js
+// Trampay/UsersService.js
 import api from "./api";
 
 export async function getProfile() {
-  const resp = await api.get("/auth/profile");
+  const resp = await api.get("/auth/me");
   return resp.data;
 }
 
 export async function updateProfile(payload) {
-  // ajusta rota se necessário (PUT /users ou /auth/profile)
-  const resp = await api.put("/users", payload);
+  const resp = await api.put("/auth/profile", payload);
   return resp.data;
 }

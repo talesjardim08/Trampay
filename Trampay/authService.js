@@ -157,7 +157,15 @@ export async function getUserProfile() {
 export async function logout() {
   try {
     await SecureStore.deleteItemAsync("token");
-    await clearLocalCache();
+    // Limpa AsyncStorage chave a chave (remover userProfile também)
+    await AsyncStorage.multiRemove([
+      "transactions",
+      "balance",
+      "lastSync",
+      "outbox",
+      "userProfile",
+      "someOtherKeyIfExists" // adicione outras chaves usadas pelo app
+    ]);
     console.log("[Auth] Logout completo e cache limpo.");
   } catch (error) {
     console.error("Erro ao sair:", error);

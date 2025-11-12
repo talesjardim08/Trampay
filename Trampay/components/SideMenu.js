@@ -1,5 +1,5 @@
-// Side Menu do Trampay
-import React from 'react';
+// Side Menu do Trampay — versão completa e integrada
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,82 +7,92 @@ import {
   SafeAreaView,
   StyleSheet,
   StatusBar,
-  Alert
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
+import api from '../services/api'; // Usa o backend .NET (ajusta a baseURL se necessário)
 
-const SideMenu = ({ navigation, user, onLogout, onClose }) => {
-  const userName = user?.name || user?.email?.split('@')[0] || 'Usuário';
+const SideMenu = ({ navigation, user: initialUser, onLogout, onClose }) => {
+  const [user, setUser] = useState(initialUser);
+  const [loading, setLoading] = useState(true);
 
-  const menuItems = [
-    {
-      id: 3,
-      title: 'Editar meus dados',
-      onPress: () => {
-        if (onClose) onClose();
-        navigation.navigate('EditProfile');
+  // 🔗 Buscar dados reais do usuário no backend
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+
+        const res = await api.get('/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setUser(res.data);
+      } catch (err) {
+        console.error('Erro ao buscar dados do usuário:', err);
+      } finally {
+        setLoading(false);
       }
-    },
-    {
-      id: 4,
-      title: 'Trampay I.A',
-      onPress: () => {
-        if (onClose) onClose();
-        navigation.navigate('TrampayIA');
-      }
-    },
-    {
-      id: 5,
-      title: 'Simulador de impostos e taxas específicas',
-      onPress: () => {
-        if (onClose) onClose();
-        navigation.navigate('TaxSimulator');
-      }
-    },
-    {
-      id: 6,
-      title: 'Assine o pro',
-      onPress: () => {
-        if (onClose) onClose();
-        navigation.navigate('SubscribePro');
-      }
-    },
-    {
-      id: 7,
-      title: 'Sair da minha conta',
-      onPress: () => {
-        Alert.alert(
-          'Confirmação',
-          'Você deseja mesmo sair?',
-          [
-            {
-              text: 'Cancelar',
-              style: 'cancel'
-            },
-            {
-              text: 'Sair',
-              style: 'destructive',
-              onPress: () => {
-                if (onLogout) {
-                  onLogout();
-                }
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }],
-                });
-              }
-            }
-          ]
-        );
-      }
+    };
+    fetchUser();
+  }, []);
+
+  // ⚠️ Bloqueia acesso às telas Premium se o usuário não for assinante
+  const handleNavigation = (screen) => {
+    const premiumScreens = [
+      'TrampayIA',
+      'CambioTrading',
+      'CryptoTrading',
+      'StocksTrading',
+      'CurrencyTrading',
+    ];
+
+    if (!user?.isPremium && premiumScreens.includes(screen)) {
+      if (onClose) onClose();
+      return navigation.navigate('SubscribePro');
     }
-  ];
+
+    if (onClose) onClose();
+    navigation.navigate(screen);
+  };
+
+  // 🔒 Logout completo
+  const handleLogout = async () => {
+    Alert.alert('Confirmação', 'Você deseja mesmo sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          await AsyncStorage.clear();
+          if (onLogout) onLogout();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        },
+      },
+    ]);
+  };
+
+  const userName =
+    user?.name || user?.email?.split('@')[0] || 'Usuário';
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.profileSection}>
@@ -96,12 +106,15 @@ const SideMenu = ({ navigation, user, onLogout, onClose }) => {
           <View style={styles.profileText}>
             <Text style={styles.greeting}>Olá,</Text>
             <Text style={styles.userName}>{userName}</Text>
+            {user?.isPremium && (
+              <Text style={styles.premiumBadge}>Usuário Premium ⭐</Text>
+            )}
           </View>
         </View>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.notificationIcon}
-          onPress={() => navigation.navigate('Notifications')}
+          onPress={() => handleNavigation('Notifications')}
         >
           <Ionicons name="notifications" size={20} color={colors.white} />
           <View style={styles.notificationBadge} />
@@ -110,44 +123,66 @@ const SideMenu = ({ navigation, user, onLogout, onClose }) => {
 
       {/* Menu Items */}
       <View style={styles.menuContainer}>
-        {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.menuItem}
-            onPress={item.onPress}
-          >
-            <Text style={styles.menuItemText}>{item.title}</Text>
-            {item.subtitle && (
-              <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-            )}
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => handleNavigation('EditProfile')}
+        >
+          <Text style={styles.menuItemText}>Editar meus dados</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => handleNavigation('TrampayIA')}
+        >
+          <Text style={styles.menuItemText}>Trampay I.A</Text>
+          {!user?.isPremium && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => handleNavigation('TaxSimulator')}
+        >
+          <Text style={styles.menuItemText}>Simulador de impostos e taxas</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => handleNavigation('SubscribePro')}
+        >
+          <Text style={styles.menuItemText}>Assine o Pro</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+          <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Feature Cards */}
       <View style={styles.featureCards}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.featureCard, { backgroundColor: '#e8f4fd' }]}
-          onPress={() => {
-            if (onClose) onClose();
-            navigation.navigate('Precificacao');
-          }}
+          onPress={() => handleNavigation('Precificacao')}
         >
           <View style={styles.featureIcon}>
-            <MaterialIcons name="attach-money" size={20} color={colors.primaryDark} />
+            <MaterialIcons
+              name="attach-money"
+              size={20}
+              color={colors.primaryDark}
+            />
           </View>
           <Text style={styles.featureText}>Precificação</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.featureCard, { backgroundColor: '#e0f2f1' }]}
-          onPress={() => {
-            if (onClose) onClose();
-            navigation.navigate('Services');
-          }}
+          onPress={() => handleNavigation('Services')}
         >
           <View style={styles.featureIcon}>
-            <MaterialIcons name="business-center" size={20} color={colors.primaryDark} />
+            <MaterialIcons
+              name="business-center"
+              size={20}
+              color={colors.primaryDark}
+            />
           </View>
           <Text style={styles.featureText}>Serviços</Text>
         </TouchableOpacity>
@@ -165,11 +200,7 @@ const SideMenu = ({ navigation, user, onLogout, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: colors.primaryDark,
     paddingHorizontal: spacing.lg,
@@ -178,13 +209,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-
+  profileSection: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   profileIcon: {
     width: 50,
     height: 50,
@@ -194,7 +219,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: spacing.md,
   },
-
   profileIconInner: {
     width: 40,
     height: 40,
@@ -203,39 +227,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  profileInitial: {
-    fontSize: 18,
-    fontFamily: fonts.bold,
-    color: colors.primaryDark,
+  profileInitial: { fontSize: 18, fontFamily: fonts.bold, color: colors.primaryDark },
+  profileText: { flex: 1 },
+  greeting: { color: colors.white, fontSize: 16, fontFamily: fonts.regular },
+  userName: { color: colors.white, fontSize: 18, fontFamily: fonts.bold },
+  premiumBadge: {
+    color: '#ffcc00',
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    marginTop: 4,
   },
-
-  profileText: {
-    flex: 1,
-  },
-
-  greeting: {
-    color: colors.white,
-    fontSize: 16,
-    fontFamily: fonts.regular,
-  },
-
-  userName: {
-    color: colors.white,
-    fontSize: 18,
-    fontFamily: fonts.bold,
-  },
-
-  notificationIcon: {
-    position: 'relative',
-    padding: spacing.sm,
-  },
-
-  notificationText: {
-    fontSize: 20,
-    color: colors.white,
-  },
-
+  notificationIcon: { position: 'relative', padding: spacing.sm },
   notificationBadge: {
     position: 'absolute',
     top: spacing.sm,
@@ -247,38 +249,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.white,
   },
-
-  menuContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-
+  menuContainer: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   menuItem: {
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
   },
-
-  menuItemText: {
-    fontSize: 16,
-    fontFamily: fonts.medium,
-    color: colors.text,
-  },
-
-  menuItemSubtitle: {
+  menuItemText: { fontSize: 16, fontFamily: fonts.medium, color: colors.text },
+  lockedText: {
     fontSize: 12,
+    color: colors.error,
+    marginTop: 4,
     fontFamily: fonts.regular,
-    color: colors.textLight,
-    marginTop: spacing.xs,
   },
-
   featureCards: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     gap: spacing.md,
   },
-
   featureCard: {
     flex: 1,
     padding: spacing.lg,
@@ -286,7 +275,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 100,
   },
-
   featureIcon: {
     width: 40,
     height: 40,
@@ -296,18 +284,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-
-  featureIconText: {
-    fontSize: 20,
-  },
-
   featureText: {
     fontSize: 12,
     fontFamily: fonts.medium,
     color: colors.primaryDark,
     textAlign: 'center',
   },
-
   closeButton: {
     marginTop: 'auto',
     marginHorizontal: spacing.lg,
@@ -317,7 +299,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-
   closeButtonText: {
     fontSize: 16,
     fontFamily: fonts.bold,
