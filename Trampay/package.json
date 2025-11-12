@@ -6,7 +6,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "EXPO_WEBPACK_HOST=0.0.0.0 EXPO_WEBPACK_PORT=5000 expo start --web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
