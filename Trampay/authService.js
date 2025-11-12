@@ -1,27 +1,53 @@
 // src/screens/authService.js
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// ---------------------------------------------
+// 🔧 Configuração da API
+// ---------------------------------------------
 const api = axios.create({
   baseURL: "https://trampay.onrender.com/api",
   headers: { "Content-Type": "application/json" },
 });
 
+// ---------------------------------------------
 // 🔒 Armazena token com segurança
+// ---------------------------------------------
 async function saveToken(token) {
   try {
     await SecureStore.setItemAsync("token", token);
+    console.log("[Auth] Token salvo com sucesso.");
   } catch (err) {
     console.error("Erro ao salvar token:", err);
   }
 }
 
+// ---------------------------------------------
+// 🧹 Limpa todo cache local após novo login
+// ---------------------------------------------
+export async function clearLocalCache() {
+  try {
+    await AsyncStorage.multiRemove([
+      "transactions",
+      "balance",
+      "lastSync",
+      "outbox",
+    ]);
+    console.log("[Auth] Cache local limpo após novo login.");
+  } catch (err) {
+    console.error("[Auth] Falha ao limpar cache:", err);
+  }
+}
+
+// ---------------------------------------------
 // 🔑 LOGIN
+// ---------------------------------------------
 export async function login(email, senha) {
   try {
     const response = await api.post("/auth/login", {
-      email: email,  
-      senha: senha, 
+      email: email,
+      senha: senha,
     });
 
     if (!response.data || !response.data.token) {
@@ -29,16 +55,22 @@ export async function login(email, senha) {
     }
 
     await saveToken(response.data.token);
+
+    // 🧹 limpa cache antes de continuar
+    await clearLocalCache();
+
+    console.log("[Auth] Login realizado com sucesso. Cache limpo.");
     return response.data;
   } catch (error) {
-    console.error("Erro no login:", error.response?.data || error.message);
+    console.error("❌ Erro no login:", error.response?.data || error.message);
     throw error;
   }
 }
 
+// ---------------------------------------------
 // 🧾 REGISTRO
+// ---------------------------------------------
 export async function registerUser(userData) {
-  // 🔥 Corrige campos para o formato esperado pelo backend
   const payload = {
     accountType: userData.AccountType,
     documentType: userData.DocumentType,
@@ -46,7 +78,7 @@ export async function registerUser(userData) {
     legalName: userData.LegalName,
     displayName: userData.DisplayName,
     birthDate: userData.BirthDate,
-    email: userData.Email,        // <- minúsculo
+    email: userData.Email,
     phone: userData.Phone,
     addressStreet: userData.AddressStreet,
     addressNumber: userData.AddressNumber,
@@ -55,44 +87,28 @@ export async function registerUser(userData) {
     addressCity: userData.AddressCity,
     addressState: userData.AddressState,
     addressZip: userData.AddressZip,
-    senha: userData.Senha || userData.password    // <- minúsculo e campo correto
+    senha: userData.Senha || userData.password,
   };
 
   console.log("📦 Enviando payload:", payload);
 
   try {
     const res = await api.post("/auth/register", payload);
-
-    // Se backend retornar token, salva
-    if (res.data?.token) {
-      await saveToken(res.data.token);
-    }
-
+    console.log("✅ Registro concluído com sucesso:", res.data);
     return { success: true, data: res.data };
   } catch (err) {
-    // 💡 Tratamento amigável para duplicidade de documento
-    const rawMsg =
+    console.error("❌ Erro no registro:", err.response?.data || err.message);
+    const msg =
       err.response?.data?.error ||
       err.response?.data?.message ||
-      err.message ||
       "Falha ao criar conta.";
-
-    let msg = rawMsg;
-
-    if (
-      rawMsg.includes("Duplicate entry") &&
-      rawMsg.includes("ux_document")
-    ) {
-      msg =
-        "Já existe um usuário cadastrado com este documento (CPF/CNPJ).";
-    }
-
-    console.error("❌ Erro no registro:", msg);
     return { success: false, message: msg };
   }
 }
 
+// ---------------------------------------------
 // 🔄 ESQUECI SENHA
+// ---------------------------------------------
 export async function forgotPassword(payload) {
   try {
     const response = await api.post("/auth/forgot-password", payload);
@@ -112,15 +128,22 @@ export async function forgotPassword(payload) {
   }
 }
 
-// 👤 PERFIL (verifica token)
+// ---------------------------------------------
+// 👤 PERFIL (verifica token e busca dados do usuário)
+// ---------------------------------------------
 export async function getUserProfile() {
   try {
     const token = await SecureStore.getItemAsync("token");
-    if (!token) return null;
+    if (!token) {
+      console.warn("[Auth] Nenhum token encontrado. Usuário não autenticado.");
+      return null;
+    }
 
     const response = await api.get("/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    console.log("[Auth] Perfil obtido do servidor:", response.data?.email);
     return response.data;
   } catch (error) {
     console.error("Erro ao obter perfil:", error.response?.data || error.message);
@@ -128,11 +151,20 @@ export async function getUserProfile() {
   }
 }
 
+// ---------------------------------------------
 // 🚪 LOGOUT
+// ---------------------------------------------
 export async function logout() {
   try {
     await SecureStore.deleteItemAsync("token");
+    await clearLocalCache();
+    console.log("[Auth] Logout completo e cache limpo.");
   } catch (error) {
     console.error("Erro ao sair:", error);
   }
 }
+
+// ---------------------------------------------
+// Exporta API para uso geral
+// ---------------------------------------------
+export default api;

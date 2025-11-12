@@ -1,39 +1,53 @@
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// src/services/api.js
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const API_BASE = "https://trampay.onrender.com";
-
+const API_BASE = 'https://trampay.onrender.com/api'; // URL do backend (Render) - ajuste se necessário
 
 const api = axios.create({
-  baseURL: `${API_BASE}/api`,
-  timeout: 15000,
-  headers: { "Content-Type": "application/json" },
+  baseURL: API_BASE,
+  timeout: 30000,
 });
 
-// Request interceptor: insere token automaticamente
+// Interceptor de requisição: anexa token se existir
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('@trampay_token');
       if (token) {
-        config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (e) {
-      console.warn("Erro lendo token:", e);
+    } catch (err) {
+      console.warn('Erro ao ler token do AsyncStorage', err);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor (opcional): detecta 401 para logout centralizado (se desejar)
+// Interceptor de resposta: tratamento global simples
 api.interceptors.response.use(
-  (resp) => resp,
+  (response) => response,
   async (error) => {
-    // você pode tratar globalmente 401 aqui se quiser
+    if (error?.response?.status === 401) {
+       console.warn('401 recebido do servidor');
+      // não limpar automaticamente aqui para não "surpreender" a UI;
+      // deixe o AuthContext lidar com logout se quiser.
+    }
     return Promise.reject(error);
   }
 );
+
+// helper para upload (FormData)
+api.upload = (path, formData) => {
+  return api.post(path, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    // tempo maior caso upload seja grande
+    timeout: 60000,
+  });
+};
 
 export default api;

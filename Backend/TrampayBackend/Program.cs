@@ -6,11 +6,14 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using TrampayBackend.Middleware;
 using Microsoft.Extensions.FileProviders;
+using TrampayBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 var services = builder.Services;
 
+builder.Services.AddHttpClient<AiService>();
+builder.Services.AddTransient<AiService>();
 // -----------------------------
 // CONNECTION (MySQL)
 // -----------------------------
