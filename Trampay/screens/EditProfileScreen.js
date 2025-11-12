@@ -1,5 +1,5 @@
 // Tela Editar Perfil do Trampay
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -9,125 +9,80 @@ import {
   SafeAreaView,
   StyleSheet,
   Alert,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, spacing } from '../styles';
+import { AuthContext } from '../AuthContext';
+import api from '../services/api';
 
-const EditProfileScreen = ({ navigation, user }) => {
+const EditProfileScreen = ({ navigation }) => {
+  const { user, setUser } = useContext(AuthContext);
+  
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
+    displayName: '',
+    email: '',
+    phone: '',
     password: ''
   });
   const [profileImage, setProfileImage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Carrega dados do perfil salvos
+  // Carrega dados do perfil do usuário logado
   useEffect(() => {
     loadProfileData();
-  }, []);
+  }, [user]);
 
-  const loadProfileDatas = async () => {
-    try {
-      const savedProfile = await AsyncStorage.getItem('userProfile');
-      if (savedProfile) {
-        const profile = JSON.parse(savedProfile);
-        setFormData({
-          name: profile.name || '',
-          email: profile.email || '',
-          phone: profile.phone || '',
-          password: '' // Nunca carrega senha por segurança
-        });
-        if (profile.profileImage) {
-          setProfileImage(profile.profileImage);
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar perfil:', error);
+  const loadProfileData = () => {
+    if (user) {
+      setFormData({
+        displayName: user.displayName || user.legalName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        password: ''
+      });
     }
   };
 
-  const loadProfileData = async () => {
-  try {
-    // tenta carregar do backend
-    const serverProfile = await getProfile();
-    if (serverProfile) {
-      setFormData({
-        name: serverProfile.displayName || serverProfile.legalName || '',
-        email: serverProfile.email || '',
-        phone: serverProfile.phone || '',
-        password: ''
-      });
-      setProfileImage(serverProfile.profileImage || null); // se existir coluna
-      await AsyncStorage.setItem('userProfile', JSON.stringify(serverProfile));
+  const handleSave = async () => {
+    if (!formData.displayName || !formData.email) {
+      Alert.alert('Erro', 'Nome e email são obrigatórios.');
       return;
     }
-  } catch (e) {
-    console.warn("Não foi possível carregar perfil do servidor, usando cache local.", e);
-  }
+    
+    setIsLoading(true);
+    try {
+      const payload = {
+        email: formData.email,
+        displayName: formData.displayName,
+        phone: formData.phone,
+      };
 
-  // fallback para cache local
-  const savedProfile = await AsyncStorage.getItem('userProfile');
-  if (savedProfile) {
-    const profile = JSON.parse(savedProfile);
-    setFormData({
-      name: profile.displayName || profile.name || '',
-      email: profile.email || '',
-      phone: profile.phone || '',
-      password: ''
-    });
-    setProfileImage(profile.profileImage || null);
-  }
-};
+      // Só envia senha se foi preenchida
+      if (formData.password && formData.password.trim()) {
+        payload.password = formData.password;
+      }
 
-const handleSave = async () => {
-  if (!formData.name || !formData.email) {
-    Alert.alert('Erro', 'Nome e email são obrigatórios.');
-    return;
-  }
-  setIsLoading(true);
-  try {
-    // Pega id do token ou do cache local. Supondo que token contenha id no JWT ou que userProfile tenha id
-    const saved = await AsyncStorage.getItem('userProfile');
-    let userId = null;
-    if (saved) {
-      try { userId = JSON.parse(saved).id; } catch {}
+      const response = await api.put('/auth/profile', payload);
+      
+      if (response.data) {
+        // Atualiza contexto
+        if (setUser) {
+          setUser(response.data);
+        }
+        Alert.alert('Sucesso!', 'Seus dados foram atualizados.');
+        navigation.goBack();
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar perfil:", err);
+      Alert.alert('Erro', err.response?.data?.error || 'Não foi possível atualizar seu perfil.');
+    } finally {
+      setIsLoading(false);
     }
-
-    // Se não tem id, tenta buscar do GET /users/me
-    if (!userId) {
-      const serverProfile = await getProfile();
-      userId = serverProfile?.id;
-    }
-
-    if (!userId) {
-      throw new Error("ID do usuário não encontrado");
-    }
-
-    const payload = {
-      email: formData.email,
-      displayName: formData.name,
-      phone: formData.phone,
-      password: formData.password ? formData.password : undefined
-    };
-
-    const updated = await updateProfile(userId, payload);
-
-    // atualiza cache local
-    await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
-    Alert.alert('Sucesso!', 'Seus dados foram atualizados.');
-  } catch (err) {
-    console.error("Erro ao atualizar perfil:", err);
-    Alert.alert('Erro', 'Não foi possível atualizar seu perfil. Tente novamente.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({
@@ -137,7 +92,6 @@ const handleSave = async () => {
   };
 
   const pickImage = async () => {
-    // Pede permissão para acessar a galeria
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permissão necessária', 'Precisamos da permissão para acessar suas fotos.');
@@ -179,18 +133,7 @@ const handleSave = async () => {
     });
 
     if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      // Salva imagem automaticamente para persistência imediata
-      try {
-        const currentProfile = await AsyncStorage.getItem('userProfile');
-        const profile = currentProfile ? JSON.parse(currentProfile) : {};
-        profile.profileImage = imageUri;
-        await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
-        Alert.alert('Foto atualizada!', 'Sua foto foi salva automaticamente.');
-      } catch (error) {
-        console.error('Erro ao salvar imagem:', error);
-      }
+      setProfileImage(result.assets[0].uri);
     }
   };
 
@@ -203,18 +146,7 @@ const handleSave = async () => {
     });
 
     if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      // Salva imagem automaticamente para persistência imediata
-      try {
-        const currentProfile = await AsyncStorage.getItem('userProfile');
-        const profile = currentProfile ? JSON.parse(currentProfile) : {};
-        profile.profileImage = imageUri;
-        await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
-        Alert.alert('Foto atualizada!', 'Sua foto foi salva automaticamente.');
-      } catch (error) {
-        console.error('Erro ao salvar imagem:', error);
-      }
+      setProfileImage(result.assets[0].uri);
     }
   };
 
@@ -237,7 +169,7 @@ const handleSave = async () => {
               <View style={styles.profileIcon}>
                 <View style={styles.profileIconInner}>
                   <Text style={styles.profileInitial}>
-                    {formData.name.charAt(0).toUpperCase() || 'U'}
+                    {formData.displayName.charAt(0).toUpperCase() || 'U'}
                   </Text>
                 </View>
               </View>
@@ -249,12 +181,7 @@ const handleSave = async () => {
           <Text style={styles.headerTitle}>Editar meus dados</Text>
         </View>
         
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <Ionicons name="notifications" size={20} color={colors.white} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content}>
@@ -266,8 +193,8 @@ const handleSave = async () => {
               style={styles.input}
               placeholder="João Victor Queiroz"
               placeholderTextColor={colors.placeholder}
-              value={formData.name}
-              onChangeText={(value) => updateFormData('name', value)}
+              value={formData.displayName}
+              onChangeText={(value) => updateFormData('displayName', value)}
             />
           </View>
 
@@ -275,7 +202,7 @@ const handleSave = async () => {
             <Text style={styles.label}>EMAIL</Text>
             <TextInput
               style={styles.input}
-              placeholder="joaovictorqueiroz@gmail.com"
+              placeholder="joao@example.com"
               placeholderTextColor={colors.placeholder}
               value={formData.email}
               onChangeText={(value) => updateFormData('email', value)}
@@ -285,7 +212,7 @@ const handleSave = async () => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>SENHA</Text>
+            <Text style={styles.label}>SENHA (deixe em branco para manter)</Text>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
@@ -322,9 +249,11 @@ const handleSave = async () => {
             onPress={handleSave}
             disabled={isLoading}
           >
-            <Text style={styles.saveButtonText}>
-              {isLoading ? 'Salvando...' : 'Editar'}
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.saveButtonText}>Salvar Alterações</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -416,14 +345,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontFamily: fonts.bold,
-  },
-
-  notificationButton: {
-    padding: spacing.sm,
-  },
-
-  notificationIcon: {
-    padding: spacing.sm,
   },
 
   content: {

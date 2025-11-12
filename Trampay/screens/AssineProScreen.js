@@ -1,32 +1,49 @@
 // src/screens/AssineProScreen.js
 import React, { useContext, useState } from 'react';
-import { View, Text, Button, Alert, StyleSheet } from 'react-native';
-import api from '../services/api';
+import { View, Text, Button, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { AuthContext } from '../AuthContext';
 
 const AssineProScreen = ({ navigation }) => {
-  const { user, setUser } = useContext(AuthContext);
+  const { activatePro, isPro, loading: authLoading } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
 
   const handleActivatePro = async () => {
-  try {
-    const res = await api.post("/subscription/activate");
-    if (res.status === 200) {
-      Alert.alert("Sucesso!", "Você agora é um usuário Premium!");
-      const user = await api.get("/users/me");
-      await AsyncStorage.setItem("userProfile", JSON.stringify(user.data));
+    setLoading(true);
+    try {
+      await activatePro();
+      // Navega de volta após ativação
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
+    } catch (err) {
+      console.error("Erro ao ativar Pro:", err);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Erro ao ativar Pro:", err);
-    Alert.alert("Erro", "Não foi possível ativar sua assinatura agora.");
+  };
+
+  if (isPro) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>💎 Você já é PRO!</Text>
+        <Text style={styles.subtitle}>Aproveite todos os recursos premium.</Text>
+        <View style={{ marginTop: 20 }}>
+          <Button title="Voltar" onPress={() => navigation.goBack()} />
+        </View>
+      </View>
+    );
   }
-};
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Assine Trampay PRO</Text>
+      <Text style={styles.title}>Assine Trampay PRO 💎</Text>
       <Text style={styles.subtitle}>Desbloqueie IA, Precificação, Câmbio e Trading.</Text>
       <View style={{ marginTop: 20 }}>
-        <Button title={loading ? 'Aguarde...' : 'Quero ser Premium'} onPress={handleActivatePro} disabled={loading} />
+        {loading || authLoading ? (
+          <ActivityIndicator size="large" color="#007AFF" />
+        ) : (
+          <Button title="Quero ser Premium" onPress={handleActivatePro} />
+        )}
       </View>
     </View>
   );

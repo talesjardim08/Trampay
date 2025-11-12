@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
           const profile = await getUserProfile();
           if (profile) {
             setUser(profile);
-            setIsPro(profile.isPro || false);
+            setIsPro(profile.isPremium || profile.isPro || false);
           }
         } else {
           console.log("[AuthContext] Nenhum token encontrado.");
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         const profile = await getUserProfile();
         if (profile) {
           setUser(profile);
-          setIsPro(profile.isPro || false);
+          setIsPro(profile.isPremium || profile.isPro || false);
           Alert.alert("✅ Login realizado com sucesso!");
         }
       }
@@ -105,12 +105,33 @@ export const AuthProvider = ({ children }) => {
   // ---------------------------------------------
   // 💎 Atualiza status PRO (assinatura)
   // ---------------------------------------------
-  const activatePro = () => {
-    setIsPro(true);
-    if (user) {
-      setUser({ ...user, isPro: true });
+  const activatePro = async () => {
+    try {
+      setLoading(true);
+      const token = await SecureStore.getItemAsync("token");
+      if (!token) {
+        Alert.alert("❌ Erro", "Você precisa estar logado para ativar o PRO.");
+        return;
+      }
+
+      const api = require('./services/api').default;
+      const response = await api.post('/subscription/activate');
+      
+      if (response.data.success) {
+        // Recarrega perfil para obter dados atualizados
+        const profile = await getUserProfile();
+        if (profile) {
+          setUser(profile);
+          setIsPro(profile.isPremium || false);
+        }
+        Alert.alert("💎 Parabéns!", "Sua conta PRO foi ativada com sucesso!");
+      }
+    } catch (error) {
+      console.error("Erro ao ativar PRO:", error);
+      Alert.alert("❌ Erro", "Não foi possível ativar a assinatura PRO.");
+    } finally {
+      setLoading(false);
     }
-    Alert.alert("💎 Parabéns!", "Sua conta PRO foi ativada com sucesso!");
   };
 
   // ---------------------------------------------
@@ -118,6 +139,7 @@ export const AuthProvider = ({ children }) => {
   // ---------------------------------------------
   const value = {
     user,
+    setUser,
     isPro,
     loading,
     handleLogin,
