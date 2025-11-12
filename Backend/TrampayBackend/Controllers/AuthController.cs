@@ -9,6 +9,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TrampayBackend.Controllers
 {
@@ -25,7 +26,7 @@ namespace TrampayBackend.Controllers
             _cfg = cfg;
         }
 
-        // ---------- LOGIN
+        // ---------- LOGIN ----------
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] JsonElement body)
         {
@@ -47,97 +48,140 @@ namespace TrampayBackend.Controllers
                     return BadRequest(new { error = "Credenciais inválidas" });
 
                 var token = GenerateJwt(user.id);
-                return Ok(new { token, user = new { id = user.id, email = user.email } });
+
+                return Ok(new
+                {
+                    token,
+                    user = new
+                    {
+                        id = user.id,
+                        email = user.email
+                    }
+                });
             }
             catch (Exception ex)
             {
-                return Problem(detail: ex.Message);
+                Console.WriteLine($"[LOGIN ERROR] {ex.Message}");
+                return Problem(detail: ex.Message, title: "Erro interno no login");
             }
         }
 
-        // ---------- REGISTER
-       [HttpPost("register")]
-public async Task<IActionResult> Register([FromBody] JsonElement body)
-{
-    try
-    {
-        string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
-        string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
-        string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "00000000000";
-        string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "Usuário";
-        string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName") ?? legalName;
-        string email = GetString(body, "Email") ?? GetString(body, "email");
-        string phone = GetString(body, "Phone") ?? GetString(body, "phone") ?? "00000000000";
-        string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
-
-        // 🚨 Campos obrigatórios
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
-            return BadRequest(new { error = "Email e senha são obrigatórios." });
-
-        // 🔍 Checa duplicação de e-mail
-        var exists = await _db.QueryFirstOrDefaultAsync<int?>(
-            "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
-
-        if (exists != null)
-            return BadRequest(new { error = "Email já cadastrado." });
-
-        // 🔐 Hash seguro da senha
-        var hash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-        // ✅ Insert compatível com o banco
-        var insert = @"
-            INSERT INTO users 
-              (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, is_active, is_verified, created_at)
-            VALUES
-              (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, 1, 1, NOW());
-            SELECT LAST_INSERT_ID();";
-
-        var id = await _db.ExecuteScalarAsync<long>(insert, new
+        // ---------- REGISTER ----------
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] JsonElement body)
         {
-            AccountType = accountType,
-            DocumentType = documentType,
-            DocumentNumber = documentNumber,
-            LegalName = legalName,
-            DisplayName = displayName,
-            Email = email,
-            Phone = phone,
-            PasswordHash = hash
-        });
-
-        // 🔑 Gera token JWT
-        var token = GenerateJwt(id);
-
-        return Ok(new
-        {
-            token,
-            user = new
+            try
             {
-                id,
-                email,
-                displayName,
-                legalName,
-                accountType,
-                documentType
+                string accountType = GetString(body, "AccountType") ?? GetString(body, "accountType") ?? "pf";
+                string documentType = GetString(body, "DocumentType") ?? GetString(body, "documentType") ?? "CPF";
+                string documentNumber = GetString(body, "DocumentNumber") ?? GetString(body, "documentNumber") ?? "00000000000";
+                string legalName = GetString(body, "LegalName") ?? GetString(body, "legalName") ?? GetString(body, "Name") ?? "Usuário";
+                string displayName = GetString(body, "DisplayName") ?? GetString(body, "displayName") ?? legalName;
+                string email = GetString(body, "Email") ?? GetString(body, "email");
+                string phone = GetString(body, "Phone") ?? GetString(body, "phone") ?? "00000000000";
+                string senha = GetString(body, "Senha") ?? GetString(body, "senha") ?? GetString(body, "Password") ?? GetString(body, "password");
+
+                // 🚨 Campos obrigatórios
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
+                    return BadRequest(new { error = "Email e senha são obrigatórios." });
+
+                // 🔍 Checa duplicação de e-mail
+                var exists = await _db.QueryFirstOrDefaultAsync<int?>(
+                    "SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = email });
+
+                if (exists != null)
+                    return BadRequest(new { error = "Email já cadastrado." });
+
+                // 🔐 Hash seguro da senha
+                var hash = BCrypt.Net.BCrypt.HashPassword(senha);
+
+                // ✅ Insert compatível com o banco
+                var insert = @"
+                    INSERT INTO users 
+                      (account_type, document_type, document_number, legal_name, display_name, email, phone, password_hash, is_active, is_verified, created_at)
+                    VALUES
+                      (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @Email, @Phone, @PasswordHash, 1, 1, NOW());
+                    SELECT LAST_INSERT_ID();";
+
+                var id = await _db.ExecuteScalarAsync<long>(insert, new
+                {
+                    AccountType = accountType,
+                    DocumentType = documentType,
+                    DocumentNumber = documentNumber,
+                    LegalName = legalName,
+                    DisplayName = displayName,
+                    Email = email,
+                    Phone = phone,
+                    PasswordHash = hash
+                });
+
+                // 🔑 Gera token JWT
+                var token = GenerateJwt(id);
+
+                return Ok(new
+                {
+                    token,
+                    user = new
+                    {
+                        id,
+                        email,
+                        displayName,
+                        legalName,
+                        accountType,
+                        documentType
+                    }
+                });
             }
-        });
-    }
-    catch (Exception ex)
-    {
-        // Log mais detalhado no servidor
-        Console.WriteLine($"[REGISTER ERROR] {ex.Message}");
-        return Problem(detail: ex.Message, title: "Erro interno ao registrar usuário");
-    }
-}
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[REGISTER ERROR] {ex.Message}");
+                return Problem(detail: ex.Message, title: "Erro interno ao registrar usuário");
+            }
+        }
+
+        // ---------- GET USER PROFILE (Token Validation) ----------
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetProfile()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst("id");
+                if (userIdClaim == null)
+                    return Unauthorized(new { error = "Token inválido." });
+
+                if (!long.TryParse(userIdClaim.Value, out var userId))
+                    return Unauthorized(new { error = "ID do token inválido." });
+
+                var sql = "SELECT id, email, display_name, legal_name, account_type, document_type, phone, is_active FROM users WHERE id = @Id LIMIT 1";
+                var user = await _db.QueryFirstOrDefaultAsync(sql, new { Id = userId });
+
+                if (user == null)
+                    return NotFound(new { error = "Usuário não encontrado." });
+
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PROFILE ERROR] {ex.Message}");
+                return Problem(detail: ex.Message, title: "Erro ao obter perfil do usuário");
+            }
+        }
 
         // ---------- Helpers ----------
         private string GenerateJwt(long userId)
         {
-            var key = _cfg["Jwt:Key"] ?? Environment.GetEnvironmentVariable("Jwt__Key") ?? "troquesecreta_dev_mude";
-            var issuer = _cfg["Jwt:Issuer"] ?? "trampay.local";
-            var audience = _cfg["Jwt:Audience"] ?? "trampay.local";
+            var key = _cfg["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "troque-essa-chave-por-uma-segura";
+            var issuer = _cfg["Jwt:Issuer"] ?? "TrampayApi";
+            var audience = _cfg["Jwt:Audience"] ?? "TrampayApp";
             var keyBytes = Encoding.UTF8.GetBytes(key);
 
-            var claims = new[] { new Claim("id", userId.ToString()) };
+            var claims = new[]
+            {
+                new Claim("id", userId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString())
+            };
 
             var token = new JwtSecurityToken(
                 issuer: issuer,
@@ -150,7 +194,6 @@ public async Task<IActionResult> Register([FromBody] JsonElement body)
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        // ✅ Método fixo para leitura segura de campos no JSON
         private string? GetString(JsonElement body, string name)
         {
             try
@@ -158,14 +201,12 @@ public async Task<IActionResult> Register([FromBody] JsonElement body)
                 if (body.ValueKind != JsonValueKind.Object)
                     return null;
 
-                // Tenta buscar exatamente
                 if (body.TryGetProperty(name, out JsonElement prop))
                 {
                     if (prop.ValueKind == JsonValueKind.String) return prop.GetString();
                     else return prop.ToString();
                 }
 
-                // Tenta buscar ignorando maiúsculas/minúsculas
                 foreach (var p in body.EnumerateObject())
                 {
                     if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))

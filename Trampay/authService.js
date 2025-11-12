@@ -58,26 +58,39 @@ export async function registerUser(userData) {
     senha: userData.Senha || userData.password    // <- minúsculo e campo correto
   };
 
- try {
-    const res = await api.post("/auth/register", payload);
-    return { success: true, data: res.data };
-  } catch (err) {
-    const msg =
-      err.response?.data?.error ||
-      err.response?.data?.message ||
-      "Falha ao criar conta.";
-    return { success: false, message: msg };
-  }
-  
-  
   console.log("📦 Enviando payload:", payload);
 
-  const res = await api.post("/auth/register", payload);
-  return res.data;
+  try {
+    const res = await api.post("/auth/register", payload);
+
+    // Se backend retornar token, salva
+    if (res.data?.token) {
+      await saveToken(res.data.token);
+    }
+
+    return { success: true, data: res.data };
+  } catch (err) {
+    // 💡 Tratamento amigável para duplicidade de documento
+    const rawMsg =
+      err.response?.data?.error ||
+      err.response?.data?.message ||
+      err.message ||
+      "Falha ao criar conta.";
+
+    let msg = rawMsg;
+
+    if (
+      rawMsg.includes("Duplicate entry") &&
+      rawMsg.includes("ux_document")
+    ) {
+      msg =
+        "Já existe um usuário cadastrado com este documento (CPF/CNPJ).";
+    }
+
+    console.error("❌ Erro no registro:", msg);
+    return { success: false, message: msg };
+  }
 }
-
-
-
 
 // 🔄 ESQUECI SENHA
 export async function forgotPassword(payload) {

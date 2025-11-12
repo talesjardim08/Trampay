@@ -1,5 +1,9 @@
-// Tela Home do Trampay com Dashboard completo
-import React, { useState, useEffect } from 'react';
+// Tela Home do Trampay com Dashboard completo (integrada com backend + cache)
+// Mantive 100% dos imports, estrutura visual e estilos originais — só adicionei
+// a lógica de integração com a API (GET /auth/me, GET/POST /transactions),
+// sincronização com SecureStore/AsyncStorage, tratamento de erros e logs detalhados.
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +14,14 @@ import {
   Dimensions,
   StyleSheet,
   Modal,
-  Alert
+  Alert,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import axios from 'axios';
 import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
@@ -24,6 +31,7 @@ const { width } = Dimensions.get('window');
 const HomeScreen = ({ navigation, user, route }) => {
   // Pega dados do usuário dos parâmetros da rota ou props
   const currentUser = route?.params?.user || user;
+
   // Estados para filtros e dados
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [transactionFilter, setTransactionFilter] = useState('Entrada');
@@ -58,139 +66,421 @@ const HomeScreen = ({ navigation, user, route }) => {
     frequency: 'none' // none, daily, weekly, monthly
   });
 
+  // Loading / sync states
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
   // Chaves de armazenamento compartilhadas com CashFlowScreen
   const TRANSACTIONS_STORAGE_KEY = 'trampay_transactions';
   const BALANCE_STORAGE_KEY = 'trampay_balance';
-  
-  const userName = currentUser?.name || currentUser?.email?.split('@')[0] || 'Usuário';
+  const EVENTS_STORAGE_KEY = 'userEvents';
+  const OUTBOX_STORAGE_KEY = 'trampay_transactions_outbox'; // transações locais pendentes de sync
 
-  // Usar apenas transações reais do SecureStore (integração completa com CashFlowScreen)
-  const allTransactions = userTransactions;
+  // Nome de usuário para exibição (mantendo comportamento original)
+  const userName = (currentUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Usuário').toString();
 
-  const filteredTransactions = allTransactions.filter(t => {
-    // Filtro por tipo (Entrada/Saída)
-    if (transactionFilter === 'Entrada' && t.type !== 'income') return false;
-    if (transactionFilter === 'Saída' && t.type !== 'expense') return false;
+  // API client (local) — insere token automaticamente a partir do SecureStore
+  const API_BASE = 'https://trampay.onrender.com/api';
+  const apiRef = useRef(null);
 
-    // Filtrar apenas moeda base (BRL) e transações concluídas (alinhado com saldo e gráficos)
-    const isBaseCurrency = (t.currency || 'BRL') === 'BRL';
-    const isConcluded = t.status === 'concluído';
-    if (!isBaseCurrency || !isConcluded) return false;
+  const initApiClient = async () => {
+    // cria instância axios e configura interceptor para inserir token
+    const token = await SecureStore.getItemAsync('token');
+    const instance = axios.create({
+      baseURL: API_BASE,
+      timeout: 15000,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-    // Filtro por texto de busca (adaptado para a nova estrutura de dados)
-    const searchableText = (t.description || t.name || '').toLowerCase();
-    if (searchText && !searchableText.includes(searchText.toLowerCase())) return false;
+    // request interceptor to add token
+    instance.interceptors.request.use(
+      async (config) => {
+        try {
+          const t = token || (await SecureStore.getItemAsync('token'));
+          if (t) config.headers.Authorization = `Bearer ${t}`;
+        } catch (e) {
+          console.warn('[API] erro lendo token no interceptor', e);
+        }
+        return config;
+      },
+      (err) => Promise.reject(err)
+    );
 
-    // Filtro por valor (usando filterValues)
-    if (filterValues.minAmount && Math.abs(t.amount) < parseFloat(filterValues.minAmount)) return false;
-    if (filterValues.maxAmount && Math.abs(t.amount) > parseFloat(filterValues.maxAmount)) return false;
+    apiRef.current = instance;
+  };
 
-    // Filtro temporal baseado em datas reais das transações
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
-    const dayAfterTomorrow = new Date(tomorrow.getTime() + (24 * 60 * 60 * 1000));
-    
-    // Use transactionDate se disponível, senão use createdAt (alinhado com CashFlowScreen)
-    const transactionDateStr = t.transactionDate || t.createdAt;
-    const transactionDate = new Date(transactionDateStr);
-    
-    // Exclui transações com datas inválidas (não força exibição)
-    if (isNaN(transactionDate.getTime())) {
-      return false;
-    }
-    
-    const transactionDay = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
-    
-    if (timeFilter === 'Hoje') {
-      return transactionDay.getTime() === today.getTime();
-    } else if (timeFilter === 'Amanhã') {
-      return transactionDay.getTime() === tomorrow.getTime();
-    } else if (timeFilter === 'Futuros') {
-      return transactionDay.getTime() >= dayAfterTomorrow.getTime();
-    }
-
-    return true;
-  });
-
-
-  // Carrega dados salvos ao iniciar
+  // Use ref to avoid re-creating the axios client multiple times
   useEffect(() => {
-    loadSavedData();
+    initApiClient();
   }, []);
 
-  const loadSavedData = async () => {
-    try {
-      // Carrega transações do SecureStore (mesmo sistema do fluxo de caixa)
-      const savedTransactions = await SecureStore.getItemAsync(TRANSACTIONS_STORAGE_KEY);
-      if (savedTransactions) {
-        setUserTransactions(JSON.parse(savedTransactions));
-      }
-
-      // Carrega saldo do SecureStore (mesmo sistema do fluxo de caixa)
-      const savedBalance = await SecureStore.getItemAsync(BALANCE_STORAGE_KEY);
-      if (savedBalance) {
-        setBalance(parseFloat(savedBalance));
-      }
-
-      // Carrega eventos do AsyncStorage (funcionalidade específica da HomeScreen)
-      const savedEvents = await AsyncStorage.getItem('userEvents');
-      if (savedEvents) {
-        setEvents(JSON.parse(savedEvents));
-      }
-      console.log('Dados carregados com sucesso');
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    }
-  };
-
-  const saveDataToStorage = async (key, data) => {
-    try {
-      await AsyncStorage.setItem(key, JSON.stringify(data));
-      console.log(`${key} salvo com sucesso`);
-    } catch (error) {
-      console.error(`Erro ao salvar ${key}:`, error);
-    }
-  };
-
-  // Função para salvar dados no SecureStore (compartilhado com CashFlowScreen)
+  // --- Helper: persist e read utilities (SecureStore + AsyncStorage) ---
   const saveSecureData = async (key, data) => {
     try {
       await SecureStore.setItemAsync(key, JSON.stringify(data));
-      console.log(`${key} salvo com sucesso no SecureStore`);
-    } catch (error) {
-      console.error(`Erro ao salvar ${key} no SecureStore:`, error);
+    } catch (err) {
+      console.error(`[SecureStore] erro ao salvar ${key}:`, err);
     }
   };
 
-  // Função para adicionar nova transação com persistência (integrada com fluxo de caixa)
-  const handleAddTransaction = async (transactionData) => {
-    const baseCurrency = 'BRL';
-    
-    const newTransaction = {
-      ...transactionData,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      status: transactionData.isRecurring ? 'agendado' : 'concluído'
+  const loadSecureData = async (key) => {
+    try {
+      const raw = await SecureStore.getItemAsync(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      console.error(`[SecureStore] erro ao carregar ${key}:`, err);
+      return null;
+    }
+  };
+
+  const saveAsyncData = async (key, data) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+    } catch (err) {
+      console.error(`[AsyncStorage] erro ao salvar ${key}:`, err);
+    }
+  };
+
+  const loadAsyncData = async (key) => {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      console.error(`[AsyncStorage] erro ao carregar ${key}:`, err);
+      return null;
+    }
+  };
+
+  // --- Core: Load data (cache first, then try server) ---
+  const loadSavedData = async () => {
+    setError(null);
+    try {
+      // Carrega transações locais (cache)
+      const savedTransactions = await loadSecureData(TRANSACTIONS_STORAGE_KEY);
+      if (savedTransactions) {
+        console.log('[Home] carregando transações do SecureStore (cache). Quantidade:', savedTransactions.length);
+        setUserTransactions(savedTransactions);
+      } else {
+        console.log('[Home] sem transações locais no SecureStore.');
+      }
+
+      // Carrega saldo local
+      const savedBalance = await loadSecureData(BALANCE_STORAGE_KEY);
+      if (savedBalance != null) {
+        const parsed = parseFloat(savedBalance);
+        setBalance(Number.isNaN(parsed) ? 0 : parsed);
+        console.log('[Home] saldo carregado do cache:', parsed);
+      }
+
+      // Carrega eventos do AsyncStorage
+      const savedEvents = await loadAsyncData(EVENTS_STORAGE_KEY);
+      if (savedEvents) {
+        setEvents(savedEvents);
+        console.log('[Home] eventos carregados do AsyncStorage:', savedEvents.length);
+      }
+
+    } catch (err) {
+      console.error('[Home] erro ao carregar dados locais:', err);
+      setError('Erro ao carregar dados locais.');
+    } finally {
+      setLoading(false); // mostra UI mesmo que api remoto ainda não tenha respondido
+    }
+  };
+
+  // --- Fetch profile from backend
+  const fetchProfileFromServer = async () => {
+    if (!apiRef.current) {
+      console.warn('[Home] apiRef não inicializada antes de fetchProfileFromServer');
+      return null;
+    }
+    try {
+      const resp = await apiRef.current.get('/auth/me');
+      console.log('[Home] perfil obtido do servidor:', resp?.data?.displayName || resp?.data?.email);
+      return resp.data;
+    } catch (err) {
+      console.warn('[Home] falha ao buscar perfil no servidor:', err?.response?.data || err.message);
+      return null;
+    }
+  };
+
+  // --- Fetch transactions from backend
+  const fetchTransactionsFromServer = async (params = {}) => {
+    if (!apiRef.current) {
+      console.warn('[Home] apiRef não inicializada antes de fetchTransactionsFromServer');
+      return null;
+    }
+    try {
+      // envia query params se houver
+      const resp = await apiRef.current.get('/transactions', { params });
+      if (resp?.data) {
+        console.log('[Home] transações obtidas do servidor:', resp.data.length);
+        return resp.data;
+      }
+      return [];
+    } catch (err) {
+      console.warn('[Home] falha ao buscar transações no servidor:', err?.response?.data || err.message);
+      return null;
+    }
+  };
+
+  // --- Post transaction to server
+  const postTransactionToServer = async (transaction) => {
+    if (!apiRef.current) {
+      console.warn('[Home] apiRef não inicializada antes de postTransactionToServer');
+      return { success: false, error: 'API cliente não iniciado' };
+    }
+    try {
+      const payload = {
+        // mantém a estrutura mínima esperada — ajuste campo a campo conforme backend
+        title: transaction.description || transaction.name || 'Transação',
+        amount: transaction.amount,
+        type: transaction.type, // 'income'|'expense'
+        currency: transaction.currency || 'BRL',
+        transactionDate: transaction.transactionDate || transaction.createdAt,
+        category: transaction.category || 'Sem categoria',
+        status: transaction.status || 'concluído',
+        metadata: transaction.metadata || {},
+      };
+
+      const resp = await apiRef.current.post('/transactions', payload);
+      console.log('[Home] POST /transactions sucesso — servidor retornou:', resp?.data?.id || 'sem id');
+      return { success: true, data: resp.data };
+    } catch (err) {
+      console.warn('[Home] falha ao enviar transação para o servidor:', err?.response?.data || err.message);
+      return { success: false, error: err };
+    }
+  };
+
+  // --- Outbox pattern: guarda transações locais que falharam no envio
+  const addToOutbox = async (transaction) => {
+    try {
+      const outbox = (await loadAsyncData(OUTBOX_STORAGE_KEY)) || [];
+      outbox.push(transaction);
+      await saveAsyncData(OUTBOX_STORAGE_KEY, outbox);
+      console.log('[Home] transação adicionada ao outbox (pendente):', transaction.id);
+    } catch (err) {
+      console.error('[Home] erro ao adicionar ao outbox:', err);
+    }
+  };
+
+  const flushOutbox = async () => {
+    if (!apiRef.current) {
+      console.warn('[Home] apiRef não inicializada antes de flushOutbox');
+      return;
+    }
+    setSyncing(true);
+    try {
+      const outbox = (await loadAsyncData(OUTBOX_STORAGE_KEY)) || [];
+      if (!outbox.length) {
+        console.log('[Home] outbox vazio — nada a sincronizar');
+        setSyncing(false);
+        return;
+      }
+
+      console.log('[Home] sincronizando outbox — itens:', outbox.length);
+      const successful = [];
+      const failed = [];
+
+      for (const tx of outbox) {
+        const res = await postTransactionToServer(tx);
+        if (res.success) {
+          successful.push(res.data || tx); // se servidor retornou objeto atualizado use-o
+        } else {
+          failed.push(tx);
+        }
+      }
+
+      // Atualiza outbox com os falhos
+      await saveAsyncData(OUTBOX_STORAGE_KEY, failed);
+
+      // Se tiver transações bem-sucedidas, atualiza cache local para refletir IDs do servidor
+      if (successful.length) {
+        const local = (await loadSecureData(TRANSACTIONS_STORAGE_KEY)) || [];
+        // Merge: substitui itens locais por itens retornados pelo servidor se IDs coincidirem por algum campo
+        // Aqui fazemos append seguro
+        const merged = [...local, ...successful];
+        await saveSecureData(TRANSACTIONS_STORAGE_KEY, merged);
+        setUserTransactions(merged);
+        console.log('[Home] outbox sincronizado — success:', successful.length, 'failed:', failed.length);
+      }
+    } catch (err) {
+      console.error('[Home] erro ao flushOutbox:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // --- Reconcile server <-> local (fetch remoto e substituir/merge local se disponível)
+  const syncFromServer = async () => {
+    if (!apiRef.current) {
+      console.warn('[Home] apiRef não inicializada antes de syncFromServer');
+      return;
+    }
+    setSyncing(true);
+    try {
+      const remote = await fetchTransactionsFromServer();
+      if (remote === null) {
+        console.log('[Home] syncFromServer: servidor indisponível — abortando sincronia remota');
+        setSyncing(false);
+        return;
+      }
+
+      // Normalize remote items to expected local shape (tenta preservar campos locais)
+      const normalized = (remote || []).map((r) => ({
+        id: r.id?.toString() || (r._id ? r._id.toString() : undefined),
+        description: r.title || r.description || r.name,
+        amount: parseFloat(r.amount) || 0,
+        type: r.type || (r.amount >= 0 ? 'income' : 'expense'),
+        currency: r.currency || 'BRL',
+        transactionDate: r.transactionDate || r.createdAt || new Date().toISOString(),
+        createdAt: r.createdAt || r.transactionDate || new Date().toISOString(),
+        status: r.status || 'concluído',
+        category: r.category || r.tags || 'Variável',
+        metadata: r.metadata || {},
+      }));
+
+      // Salva no SecureStore (substitui cache local pelos dados remotos)
+      await saveSecureData(TRANSACTIONS_STORAGE_KEY, normalized);
+      setUserTransactions(normalized);
+      console.log('[Home] syncFromServer — cache atualizado com dados remotos. Total:', normalized.length);
+    } catch (err) {
+      console.error('[Home] erro em syncFromServer:', err);
+      setError('Falha ao sincronizar com servidor.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // --- Inicialização: carrega dados locais primeiro, tenta buscar do servidor, então flush outbox
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await loadSavedData(); // carrega cache primeiro (rápido)
+        // tenta buscar perfil remotos e transações
+        const profile = await fetchProfileFromServer();
+        if (profile && mounted) {
+          // se houver perfil remoto, atualize currentUser via route params (não altera design)
+          // opcional: poderia chamar um context para atualizar usuário global; aqui apenas log
+          console.log('[Home] perfil remoto disponível:', profile.email || profile.displayName);
+        }
+
+        // tenta sincronizar outbox primeiro (enviar transações locais pendentes)
+        await flushOutbox();
+
+        // agora tentar obter dados "oficiais" do servidor e sobrescrever cache (se o servidor estiver ok)
+        await syncFromServer();
+      } catch (err) {
+        console.error('[Home] erro na inicialização completa:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    // polling opcional: sincroniza a cada X minutos — aqui definido para 5 minutos
+    const interval = setInterval(() => {
+      flushOutbox().catch(e => console.warn('[Home] flushOutbox interval falhou', e));
+      syncFromServer().catch(e => console.warn('[Home] syncFromServer interval falhou', e));
+    }, 5 * 60 * 1000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
     };
+  }, []);
 
-    const updatedTransactions = [...userTransactions, newTransaction];
-    setUserTransactions(updatedTransactions);
-    await saveSecureData(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
-
-    // Atualizar saldo apenas se a transação não for recorrente E for da moeda base
-    if (!transactionData.isRecurring && (transactionData.currency || 'BRL') === baseCurrency) {
-      const newBalance = transactionData.type === 'income' 
-        ? balance + transactionData.amount 
-        : balance - transactionData.amount;
-      setBalance(newBalance);
-      await SecureStore.setItemAsync(BALANCE_STORAGE_KEY, newBalance.toString());
+  // Pull-to-refresh: recarrega do servidor e do cache
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await flushOutbox();
+      await syncFromServer();
+    } catch (err) {
+      console.error('[Home] erro no refresh:', err);
+      setError('Falha ao atualizar. Verifique sua conexão.');
+    } finally {
+      setRefreshing(false);
     }
-
-    Alert.alert('Sucesso!', 'Transação adicionada e salva!');
   };
 
-  // Função para adicionar novo evento com persistência
+  // --- Função para adicionar nova transação com persistência local e tentativa de envio ao servidor
+  const handleAddTransaction = async (transactionData) => {
+    try {
+      // Garante formato básico
+      const baseCurrency = 'BRL';
+      const nowIso = new Date().toISOString();
+
+      const newTransaction = {
+        // unico id local temporário
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        createdAt: nowIso,
+        transactionDate: transactionData.transactionDate || nowIso,
+        description: transactionData.description || transactionData.name || 'Transação',
+        amount: parseFloat(transactionData.amount) || 0,
+        type: transactionData.type || 'expense',
+        currency: transactionData.currency || baseCurrency,
+        status: transactionData.isRecurring ? 'agendado' : 'concluído',
+        category: transactionData.category || 'Variável',
+        isLocalOnly: true, // flag para indicar que ainda não está no servidor
+        metadata: transactionData.metadata || {},
+        isRecurring: !!transactionData.isRecurring,
+      };
+
+      // Atualiza estado local e SecureStore imediatamente (optimistic UI)
+      const updatedTransactions = [newTransaction, ...userTransactions];
+      setUserTransactions(updatedTransactions);
+      await saveSecureData(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
+      console.log('[Home] transação salva localmente (optimistic):', newTransaction.id);
+
+      // Se transação for recorrente ou se usuário estiver offline, coloque no outbox
+      // Tenta enviar ao servidor
+      const res = await postTransactionToServer(newTransaction);
+      if (res.success) {
+        // Substitui item local por item retornado pelo servidor (se aplicável)
+        const serverTx = res.data;
+        // Mapeia e substitui pelo serverTx (mantém ordem)
+        const merged = updatedTransactions.map((t) =>
+          t.id === newTransaction.id ? (serverTx.id ? {
+            id: serverTx.id.toString(),
+            description: serverTx.title || serverTx.description || t.description,
+            amount: parseFloat(serverTx.amount) || t.amount,
+            type: serverTx.type || t.type,
+            currency: serverTx.currency || t.currency,
+            transactionDate: serverTx.transactionDate || t.transactionDate,
+            createdAt: serverTx.createdAt || t.createdAt,
+            status: serverTx.status || t.status,
+            category: serverTx.category || t.category,
+            metadata: serverTx.metadata || t.metadata,
+          } : t)
+          : t
+        );
+        setUserTransactions(merged);
+        await saveSecureData(TRANSACTIONS_STORAGE_KEY, merged);
+        console.log('[Home] transação sincronizada com servidor:', serverTx.id || 'sem id retornado');
+      } else {
+        // Falhou: adiciona ao outbox para re-tentativa posterior
+        await addToOutbox(newTransaction);
+        Alert.alert('Transação salva localmente', 'Sem conexão com o servidor — será sincronizada automaticamente quando possível.');
+      }
+
+      // Atualiza saldo local
+      if (!newTransaction.isRecurring && newTransaction.currency === baseCurrency) {
+        const newBalance = newTransaction.type === 'income' ? balance + newTransaction.amount : balance - newTransaction.amount;
+        setBalance(newBalance);
+        await saveSecureData(BALANCE_STORAGE_KEY, newBalance.toString());
+      }
+
+      Alert.alert('Sucesso!', 'Transação adicionada e salva!');
+    } catch (err) {
+      console.error('[Home] erro ao adicionar transação:', err);
+      Alert.alert('Erro', 'Não foi possível adicionar a transação. Tente novamente.');
+    }
+  };
+
+  // --- Funções auxiliares para eventos
   const handleAddEvent = () => {
     if (!eventForm.title || !eventForm.date || !eventForm.time) {
       Alert.alert('Erro', 'Preencha pelo menos título, data e horário.');
@@ -205,8 +495,8 @@ const HomeScreen = ({ navigation, user, route }) => {
 
     const updatedEvents = [...events, newEvent];
     setEvents(updatedEvents);
-    saveDataToStorage('userEvents', updatedEvents);
-    
+    saveAsyncData(EVENTS_STORAGE_KEY, updatedEvents);
+
     // Reset form
     setEventForm({
       title: '',
@@ -222,7 +512,7 @@ const HomeScreen = ({ navigation, user, route }) => {
       recurring: false,
       frequency: 'none'
     });
-    
+
     setShowEventModal(false);
     Alert.alert('Sucesso!', 'Evento criado e salvo!');
   };
@@ -234,61 +524,107 @@ const HomeScreen = ({ navigation, user, route }) => {
     }));
   };
 
+  // --- Filtros e cálculos de gráfico (mantidos)
+  const allTransactions = userTransactions;
+
+  const filteredTransactions = allTransactions.filter(t => {
+    // Filtro por tipo (Entrada/Saída)
+    if (transactionFilter === 'Entrada' && t.type !== 'income') return false;
+    if (transactionFilter === 'Saída' && t.type !== 'expense') return false;
+
+    // Filtrar apenas moeda base (BRL) e transações concluídas
+    const isBaseCurrency = (t.currency || 'BRL') === 'BRL';
+    const isConcluded = t.status === 'concluído';
+    if (!isBaseCurrency || !isConcluded) return false;
+
+    // Filtro por texto de busca
+    const searchableText = (t.description || t.name || '').toLowerCase();
+    if (searchText && !searchableText.includes(searchText.toLowerCase())) return false;
+
+    // Filtro por valor (usando filterValues)
+    if (filterValues.minAmount && Math.abs(t.amount) < parseFloat(filterValues.minAmount)) return false;
+    if (filterValues.maxAmount && Math.abs(t.amount) > parseFloat(filterValues.maxAmount)) return false;
+
+    // Filtro temporal baseado em datas reais das transações
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+    const dayAfterTomorrow = new Date(tomorrow.getTime() + (24 * 60 * 60 * 1000));
+
+    const transactionDateStr = t.transactionDate || t.createdAt;
+    const transactionDate = new Date(transactionDateStr);
+
+    if (isNaN(transactionDate.getTime())) {
+      return false;
+    }
+
+    const transactionDay = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+
+    if (timeFilter === 'Hoje') {
+      return transactionDay.getTime() === today.getTime();
+    } else if (timeFilter === 'Amanhã') {
+      return transactionDay.getTime() === tomorrow.getTime();
+    } else if (timeFilter === 'Futuros') {
+      return transactionDay.getTime() >= dayAfterTomorrow.getTime();
+    }
+    return true;
+  });
+
+
   // Calcula valores para o gráfico considerando período baseado em datas reais
   const calculateChartData = () => {
     const now = new Date();
     let startDate = now;
-    
-    // Define período baseado no filtro selecionado
+
     if (chartPeriod === 'Hoje') {
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     } else if (chartPeriod === 'Esta semana') {
-      // Últimos 7 dias (alinhado com CashFlowScreen)
       startDate = new Date(now.getTime() - (6 * 24 * 60 * 60 * 1000));
       startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     } else if (chartPeriod === 'Este Mês') {
-      // Primeiro dia do mês atual
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
-    
-    // Filtra transações pelo período selecionado (apenas BRL e concluídas)
+
     const transactionsToChart = allTransactions.filter(transaction => {
       const transactionDateStr = transaction.transactionDate || transaction.createdAt;
       const transactionDate = new Date(transactionDateStr);
-      
+
       if (isNaN(transactionDate.getTime())) {
-        return false; // Ignora transações com datas inválidas
+        return false;
       }
-      
-      // Filtrar apenas moeda base (BRL) e transações concluídas para alinhar com saldo
+
       const isBaseCurrency = (transaction.currency || 'BRL') === 'BRL';
       const isConcluded = transaction.status === 'concluído';
-      
+
       return transactionDate >= startDate && transactionDate <= now &&
              isBaseCurrency && isConcluded;
     });
-    
+
     const income = transactionsToChart
       .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-    
+      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
     const expenses = transactionsToChart
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-    
+      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
     return { income, expenses };
   };
 
   const { income, expenses } = calculateChartData();
 
+  // --- UI (mantive exatamente a estrutura, estilos e nomes originais)
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
         bounces={true}
         alwaysBounceVertical={true}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
@@ -306,7 +642,7 @@ const HomeScreen = ({ navigation, user, route }) => {
           </View>
 
           <View style={styles.headerRight}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => navigation.navigate('Notifications')}
             >
@@ -315,7 +651,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                 <View style={styles.notificationBadge} />
               </View>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => setShowSideMenu(true)}
             >
@@ -349,7 +685,7 @@ const HomeScreen = ({ navigation, user, route }) => {
           <>
             {/* Balance Card */}
             <View style={styles.balanceCard}>
-              <Text style={styles.balanceAmount}>R${balance.toFixed(2).replace('.', ',')}</Text>
+              <Text style={styles.balanceAmount}>R${(balance || 0).toFixed(2).replace('.', ',')}</Text>
               <Text style={styles.balanceLabel}>Saldo em mãos</Text>
             </View>
 
@@ -435,7 +771,7 @@ const HomeScreen = ({ navigation, user, route }) => {
               <TouchableOpacity style={styles.searchIcon}>
                 <Ionicons name="search" size={20} color={colors.primaryDark} />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.filterIcon}
                 onPress={() => setShowFilterModal(true)}
               >
@@ -456,26 +792,26 @@ const HomeScreen = ({ navigation, user, route }) => {
                 filteredTransactions.map((transaction) => (
                   <View key={transaction.id} style={styles.transactionItem}>
                     <View style={styles.transactionIcon}>
-                      <MaterialIcons 
-                        name={transaction.type === 'income' ? 'arrow-downward' : 'arrow-upward'} 
-                        size={20} 
-                        color={colors.white} 
+                      <MaterialIcons
+                        name={transaction.type === 'income' ? 'arrow-downward' : 'arrow-upward'}
+                        size={20}
+                        color={colors.white}
                       />
                     </View>
 
                     <View style={styles.transactionInfo}>
                       <Text style={styles.transactionName}>{transaction.description || 'Transação'}</Text>
                       <Text style={styles.transactionDate}>
-                        {new Date(transaction.createdAt).toLocaleDateString('pt-BR')}
+                        {transaction.createdAt ? new Date(transaction.createdAt).toLocaleDateString('pt-BR') : '—'}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetails}>
                       <Text style={[
-                        styles.transactionAmount,
-                        { color: transaction.type === 'income' ? colors.success : colors.danger }
-                      ]}>
-                        {transaction.type === 'income' ? '+' : '-'}R${transaction.amount.toFixed(2).replace('.', ',')}
+                          styles.transactionAmount,
+                          { color: transaction.type === 'income' ? colors.success : colors.danger }
+                        ]}>
+                        {transaction.type === 'income' ? '+' : '-'}R${(parseFloat(transaction.amount) || 0).toFixed(2).replace('.', ',')}
                       </Text>
                       <Text style={styles.transactionCategory}>{transaction.category || 'Variável'}</Text>
                     </View>
@@ -494,8 +830,8 @@ const HomeScreen = ({ navigation, user, route }) => {
               )}
 
               {/* Add New Transaction Button */}
-              <TouchableOpacity 
-                style={styles.addButton} 
+              <TouchableOpacity
+                style={styles.addButton}
                 onPress={() => setShowTransactionModal(true)}
               >
                 <MaterialIcons name="add" size={20} color={colors.white} />
@@ -537,20 +873,20 @@ const HomeScreen = ({ navigation, user, route }) => {
               {/* Interactive Chart */}
               <View style={styles.chartContainer}>
                 <View style={styles.chartBar}>
-                  <View 
+                  <View
                     style={[
                       styles.chartBarIncome,
-                      { height: income > 0 ? Math.max((income / (income + expenses)) * 100, 10) : 10 }
+                      { height: income + expenses > 0 ? Math.max((income / (income + expenses)) * 100, 10) : 10 }
                     ]}
                   />
-                  <View 
+                  <View
                     style={[
                       styles.chartBarExpense,
-                      { height: expenses > 0 ? Math.max((expenses / (income + expenses)) * 100, 10) : 10 }
+                      { height: income + expenses > 0 ? Math.max((expenses / (income + expenses)) * 100, 10) : 10 }
                     ]}
                   />
                 </View>
-                
+
                 <View style={styles.chartLegend}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendColor, { backgroundColor: colors.success }]} />
@@ -571,7 +907,7 @@ const HomeScreen = ({ navigation, user, route }) => {
             {/* Agenda Header */}
             <View style={styles.agendaHeader}>
               <Text style={styles.agendaTitle}>Minha Agenda</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addEventButton}
                 onPress={() => setShowEventModal(true)}
               >
@@ -582,17 +918,23 @@ const HomeScreen = ({ navigation, user, route }) => {
             {/* Calendar View */}
             <View style={styles.calendarContainer}>
               <Text style={styles.calendarTitle}>Setembro 2025</Text>
-              
+
               {/* Calendar Grid */}
               <View style={styles.calendarGrid}>
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
                   <Text key={index} style={styles.dayHeader}>{day}</Text>
                 ))}
-                
+
                 {Array.from({ length: 30 }, (_, i) => (
                   <TouchableOpacity key={i} style={styles.calendarDay}>
                     <Text style={styles.dayText}>{i + 1}</Text>
-                    {events.filter(event => new Date(event.date).getDate() === i + 1).length > 0 && (
+                    {events.filter(event => {
+                      try {
+                        return new Date(event.date).getDate() === i + 1;
+                      } catch (e) {
+                        return false;
+                      }
+                    }).length > 0 && (
                       <View style={styles.eventDot} />
                     )}
                   </TouchableOpacity>
@@ -622,7 +964,7 @@ const HomeScreen = ({ navigation, user, route }) => {
           </View>
         )}
       </ScrollView>
-      
+
       {/* Side Menu Modal */}
       <Modal
         visible={showSideMenu}
@@ -631,13 +973,13 @@ const HomeScreen = ({ navigation, user, route }) => {
         onRequestClose={() => setShowSideMenu(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
+          <TouchableOpacity
+            style={styles.modalBackdrop}
             onPress={() => setShowSideMenu(false)}
           />
           <View style={styles.sideMenuContainer}>
-            <SideMenu 
-              navigation={navigation} 
+            <SideMenu
+              navigation={navigation}
               user={currentUser}
               onClose={() => setShowSideMenu(false)}
             />
@@ -660,7 +1002,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Filtrar por Valor</Text>
               <View style={styles.valueFilterContainer}>
@@ -680,7 +1022,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                 />
               </View>
             </View>
-            
+
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Filtrar por Data</Text>
               <View style={styles.dateFilterContainer}>
@@ -692,9 +1034,9 @@ const HomeScreen = ({ navigation, user, route }) => {
                 </TouchableOpacity>
               </View>
             </View>
-            
+
             <View style={styles.filterButtonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.clearFilterButton}
                 onPress={() => {
                   setFilterValues({
@@ -707,11 +1049,10 @@ const HomeScreen = ({ navigation, user, route }) => {
               >
                 <Text style={styles.clearFilterText}>Limpar</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.applyFilterButton}
                 onPress={() => {
-                  // Aplicar filtros será feito na lógica de filteredTransactions
                   setShowFilterModal(false);
                 }}
               >
@@ -737,7 +1078,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.eventFormContainer}>
               {/* Título do Evento */}
               <View style={styles.inputContainer}>
@@ -749,7 +1090,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                   onChangeText={(value) => updateEventForm('title', value)}
                 />
               </View>
-              
+
               {/* Tipo de Evento */}
               <View style={styles.inputContainer}>
                 <Text style={styles.filterSectionTitle}>Tipo de Evento</Text>
@@ -770,10 +1111,10 @@ const HomeScreen = ({ navigation, user, route }) => {
                         ]}
                         onPress={() => updateEventForm('type', type.id)}
                       >
-                        <Ionicons 
-                          name={type.icon} 
-                          size={16} 
-                          color={eventForm.type === type.id ? colors.white : colors.primaryDark} 
+                        <Ionicons
+                          name={type.icon}
+                          size={16}
+                          color={eventForm.type === type.id ? colors.white : colors.primaryDark}
                         />
                         <Text style={[
                           styles.eventTypeText,
@@ -798,7 +1139,7 @@ const HomeScreen = ({ navigation, user, route }) => {
                     onChangeText={(value) => updateEventForm('date', value)}
                   />
                 </View>
-                
+
                 <View style={[styles.inputContainer, { flex: 1, marginLeft: spacing.sm }]}>
                   <Text style={styles.filterSectionTitle}>Horário *</Text>
                   <TextInput
@@ -921,16 +1262,16 @@ const HomeScreen = ({ navigation, user, route }) => {
                 </View>
               </View>
             </ScrollView>
-            
+
             <View style={styles.filterButtonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.clearFilterButton}
                 onPress={() => setShowEventModal(false)}
               >
                 <Text style={styles.clearFilterText}>Cancelar</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.applyFilterButton}
                 onPress={handleAddEvent}
               >
@@ -951,6 +1292,7 @@ const HomeScreen = ({ navigation, user, route }) => {
   );
 };
 
+// ===== STYLES (mantive exatamente sua definição original) =====
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1909,7 +2251,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     color: colors.text,
   },
-  
+
   // Novos estilos para transações atualizadas
   transactionAmount: {
     fontSize: 14,
