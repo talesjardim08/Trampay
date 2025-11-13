@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Removed AsyncStorage import - using AsyncStorage for all storage
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import api from './services/api';
+import { fetchBalance, adjustBalance } from './services/balanceService';
 import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
@@ -75,7 +76,7 @@ const HomeScreen = ({ navigation, route }) => {
 
   // Chaves de armazenamento compartilhadas com CashFlowScreen
   const TRANSACTIONS_STORAGE_KEY = 'trampay_transactions';
-  const BALANCE_STORAGE_KEY = 'trampay_balance';
+  // const BALANCE_STORAGE_KEY = "trampay_balance"; // Removido - agora usa backend
   const EVENTS_STORAGE_KEY = 'userEvents';
   const OUTBOX_STORAGE_KEY = 'trampay_transactions_outbox'; // transações locais pendentes de sync
 
@@ -117,12 +118,11 @@ const HomeScreen = ({ navigation, route }) => {
         console.log('[Home] sem transações locais no AsyncStorage.');
       }
 
-      // Carrega saldo local
-      const savedBalance = await loadAsyncData(BALANCE_STORAGE_KEY);
-      if (savedBalance != null) {
-        const parsed = parseFloat(savedBalance);
-        setBalance(Number.isNaN(parsed) ? 0 : parsed);
-        console.log('[Home] saldo carregado do cache:', parsed);
+      // Busca saldo do backend (não usa mais AsyncStorage)
+      const serverBalance = await fetchBalance('BRL');
+      if (serverBalance !== null) {
+        setBalance(serverBalance);
+        console.log('[Home] saldo carregado do servidor:', serverBalance);
       }
 
       // Carrega eventos do AsyncStorage
@@ -397,13 +397,17 @@ const HomeScreen = ({ navigation, route }) => {
         Alert.alert('Transação salva localmente', 'Sem conexão com o servidor — será sincronizada automaticamente quando possível.');
       }
 
-      // Atualiza saldo local
+      // Ajusta saldo no servidor atomicamente
       if (!newTransaction.isRecurring && newTransaction.currency === baseCurrency) {
-        const newBalance = newTransaction.type === 'income' ? balance + newTransaction.amount : balance - newTransaction.amount;
-        setBalance(newBalance);
-        await saveAsyncData(BALANCE_STORAGE_KEY, newBalance.toString());
+        const adjustment = newTransaction.type === 'income' ? newTransaction.amount : -newTransaction.amount;
+        const result = await adjustBalance(adjustment, newTransaction.currency || 'BRL');
+        if (result.success) {
+          setBalance(result.newBalance);
+          console.log('[Home] saldo ajustado para:', result.newBalance);
+        } else {
+          console.warn('[Home] falha ao ajustar saldo no servidor - mantendo local');
+        }
       }
-
       Alert.alert('Sucesso!', 'Transação adicionada e salva!');
     } catch (err) {
       console.error('[Home] erro ao adicionar transação:', err);

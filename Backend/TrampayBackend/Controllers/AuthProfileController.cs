@@ -31,6 +31,14 @@ namespace TrampayBackend.Controllers
             return Ok(user);
         }
 
+        // Alias endpoint for compatibility
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            return await GetProfile();
+        }
+
         [Authorize]
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateProfile([FromBody] ProfileUpdateDto body)

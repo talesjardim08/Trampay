@@ -92,7 +92,8 @@ namespace TrampayBackend.Services
             content.Add(byteContent, "file", file.FileName);
 
             content.Add(new StringContent("true"), "isOverlayRequired");
-            content.Add(new StringContent("pt"), "language"); // pt = portuguese
+            content.Add(new StringContent("por"), "language"); // por = portuguese (3-letter code)
+            content.Add(new StringContent("2"), "OCREngine"); // Engine 2 supports Portuguese
 
             var request = new HttpRequestMessage(HttpMethod.Post, ocrUrl);
             request.Headers.Add("apikey", ocrKey); // OCR.Space uses apikey header
