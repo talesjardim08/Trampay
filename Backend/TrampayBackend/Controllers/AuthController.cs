@@ -38,13 +38,12 @@ namespace TrampayBackend.Controllers
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
                     return BadRequest(new { error = "Email e senha são obrigatórios" });
 
-                // Query otimizada: busca user + perfil + subscription em 1 só query
+                // Query otimizada: busca user + perfil + verifica premium em 1 só query
                 var sql = @"
                     SELECT u.id, u.email, u.password_hash, u.is_active, u.account_type, u.document_type, u.document_number,
                            u.legal_name, u.display_name, u.phone, u.address_city, u.address_state,
-                           CASE WHEN s.id IS NOT NULL AND s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > NOW()) THEN 1 ELSE 0 END as is_pro
+                           CASE WHEN u.is_premium = 1 AND (u.premium_until IS NULL OR u.premium_until > NOW()) THEN 1 ELSE 0 END as is_pro
                     FROM users u
-                    LEFT JOIN subscriptions s ON u.id = s.user_id
                     WHERE u.email = @Email 
                     LIMIT 1";
                 
