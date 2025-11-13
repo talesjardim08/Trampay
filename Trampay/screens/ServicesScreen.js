@@ -11,10 +11,9 @@ import {
   Alert,
   Modal
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
-import SecureStorage from '../utils/SecureStorage';
 
 // Componentes dos modals
 import AddServiceModal from '../components/AddServiceModal';
@@ -26,88 +25,63 @@ const ServicesScreen = ({ navigation }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [services, setServices] = useState([]);
-  const [serviceTemplates, setServiceTemplates] = useState([]);
   const [clients, setClients] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [templateModalVisible, setTemplateModalVisible] = useState(false);
-  const [templateDetailsModalVisible, setTemplateDetailsModalVisible] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' ou 'roster'
+  const [activeTab, setActiveTab] = useState('calendar');
+  const [loading, setLoading] = useState(false);
 
-  // Carrega dados salvos ao iniciar
   useEffect(() => {
     loadData();
   }, []);
 
-  // Executa migração de dados na inicialização
-  useEffect(() => {
-    const performMigration = async () => {
-      try {
-        const results = await SecureStorage.migrateAllSensitiveData();
-        console.log('Resultados da migração:', results);
-      } catch (error) {
-        console.error('Erro na migração de dados:', error);
-      }
-    };
-    performMigration();
-  }, []);
-
   const loadData = async () => {
     try {
-      // Usa SecureStorage para dados sensíveis e AsyncStorage para templates
-      const [savedServices, savedTemplates, savedClients] = await Promise.all([
-        SecureStorage.getItem('userServices'),
-        AsyncStorage.getItem('serviceTemplates'),
-        SecureStorage.getItem('userClients')
+      setLoading(true);
+      const [eventsRes, clientsRes] = await Promise.all([
+        api.get('/events'),
+        api.get('/clients')
       ]);
-
-      if (savedServices) setServices(savedServices);
-      if (savedTemplates) setServiceTemplates(JSON.parse(savedTemplates));
-      if (savedClients) setClients(savedClients);
+      
+      const rawClients = clientsRes.data.items || [];
+      const clientMap = {};
+      rawClients.forEach(c => {
+        clientMap[c.id] = c.name;
+      });
+      
+      const rawEvents = eventsRes.data.items || [];
+      const normalizedEvents = rawEvents.map(event => ({
+        id: event.id,
+        date: event.event_date,
+        time: event.event_time,
+        serviceName: event.title,
+        clientId: event.client_id,
+        clientName: event.client_id ? clientMap[event.client_id] : 'Cliente não informado',
+        description: event.description || '',
+        price: event.amount || 0,
+        status: event.status || 'pending',
+        paid: event.status === 'completed',
+        type: event.type,
+        priority: event.priority,
+        location: event.location,
+        createdAt: event.created_at
+      }));
+      
+      setServices(normalizedEvents);
+      setClients(rawClients.map(c => ({
+        id: c.id,
+        name: c.name,
+        email: c.contact_email || '',
+        phone: c.contact_phone || ''
+      })));
     } catch (error) {
-      console.error('Erro ao carregar dados seguros:', error);
-      // Fallback para AsyncStorage em caso de erro
-      try {
-        const [fallbackServices, fallbackTemplates, fallbackClients] = await Promise.all([
-          AsyncStorage.getItem('userServices'),
-          AsyncStorage.getItem('serviceTemplates'),
-          AsyncStorage.getItem('userClients')
-        ]);
-
-        if (fallbackServices) setServices(JSON.parse(fallbackServices));
-        if (fallbackTemplates) setServiceTemplates(JSON.parse(fallbackTemplates));
-        if (fallbackClients) setClients(JSON.parse(fallbackClients));
-      } catch (fallbackError) {
-        console.error('Erro no fallback:', fallbackError);
-      }
+      console.error('Erro ao carregar dados:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const saveData = async () => {
-    try {
-      // Usa SecureStorage para dados sensíveis e AsyncStorage para templates
-      await Promise.all([
-        SecureStorage.setItem('userServices', services),
-        AsyncStorage.setItem('serviceTemplates', JSON.stringify(serviceTemplates)),
-        SecureStorage.setItem('userClients', clients)
-      ]);
-    } catch (error) {
-      console.error('Erro ao salvar dados seguros:', error);
-      // Em caso de erro crítico, exibe alerta de segurança
-      Alert.alert(
-        'Erro de Segurança',
-        'Não foi possível salvar os dados de forma segura. Por favor, tente novamente.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  // Salva dados sempre que houver mudanças
-  useEffect(() => {
-    saveData();
-  }, [services, serviceTemplates, clients]);
 
   // Função para gerar calendário
   const generateCalendar = () => {
@@ -169,17 +143,31 @@ const ServicesScreen = ({ navigation }) => {
     return groups;
   };
 
-  // Função para adicionar novo serviço
-  const handleAddService = (serviceData) => {
-    const newService = {
-      id: Date.now().toString(),
-      ...serviceData,
-      status: 'pending',
-      paid: false,
-      createdAt: new Date().toISOString()
-    };
-    setServices([...services, newService]);
-    setModalVisible(false);
+  const handleAddService = async (serviceData) => {
+    try {
+      const payload = {
+        clientId: serviceData.clientId || null,
+        title: serviceData.serviceName,
+        description: serviceData.description || '',
+        eventDate: serviceData.date,
+        eventTime: serviceData.time || null,
+        amount: parseFloat(serviceData.price) || 0,
+        type: 'service',
+        status: 'pending',
+        priority: 'medium',
+        location: null,
+        recurring: false,
+        frequency: null,
+        reminderMinutes: null
+      };
+      
+      await api.post('/events', payload);
+      await loadData();
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Erro ao adicionar serviço:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o serviço');
+    }
   };
 
   // Função para abrir detalhes do serviço
@@ -194,16 +182,35 @@ const ServicesScreen = ({ navigation }) => {
     }
   };
 
-  // Função para marcar serviço como pago/concluído
-  const handleServiceCompletion = (serviceId, completion) => {
-    const updatedServices = services.map(service => 
-      service.id === serviceId 
-        ? { ...service, ...completion }
-        : service
-    );
-    setServices(updatedServices);
-    setPaymentModalVisible(false);
-    setSelectedService(null);
+  const handleServiceCompletion = async (serviceId, completion) => {
+    try {
+      const service = services.find(s => s.id === serviceId);
+      if (!service) return;
+      
+      const payload = {
+        clientId: service.clientId,
+        title: service.serviceName,
+        description: service.description,
+        eventDate: service.date,
+        eventTime: service.time,
+        type: service.type || 'service',
+        priority: service.priority || 'medium',
+        location: service.location,
+        amount: service.price,
+        recurring: false,
+        frequency: null,
+        reminderMinutes: null,
+        status: completion.status || 'completed'
+      };
+      
+      await api.put(`/events/${serviceId}`, payload);
+      await loadData();
+      setPaymentModalVisible(false);
+      setSelectedService(null);
+    } catch (error) {
+      console.error('Erro ao atualizar serviço:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar o serviço');
+    }
   };
 
   // Função para adicionar template de serviço

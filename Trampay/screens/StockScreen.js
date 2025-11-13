@@ -10,105 +10,104 @@ import {
   Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
 import AddStockItemModal from '../components/AddStockItemModal';
 import StockItemDetailsModal from '../components/StockItemDetailsModal';
 
 const StockScreen = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('list'); // 'list' ou 'settings'
+  const [activeTab, setActiveTab] = useState('list');
   const [stockItems, setStockItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [services, setServices] = useState([]); // Para o dropdown de serviços
+  const [loading, setLoading] = useState(false);
 
-  // Chave de armazenamento
-  const STOCK_STORAGE_KEY = 'trampay_stock_items';
-
-  // Carregar dados iniciais
   useEffect(() => {
     loadStockItems();
-    loadServices();
   }, []);
 
-  // Carregar itens do estoque
   const loadStockItems = async () => {
     try {
-      const stored = await SecureStore.getItemAsync(STOCK_STORAGE_KEY);
-      if (stored) {
-        const items = JSON.parse(stored);
-        setStockItems(items);
-      }
+      setLoading(true);
+      const response = await api.get('/inventory');
+      const rawItems = response.data.items || [];
+      
+      const normalizedStock = rawItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        category: item.category || 'Geral',
+        quantity: item.quantity || 0,
+        unit: item.unit || 'un',
+        costPrice: item.cost_price || 0,
+        sellingPrice: item.selling_price || 0,
+        minStock: item.min_stock || 0,
+        photoUrl: item.photo_url || '',
+        createdAt: item.created_at
+      }));
+      
+      setStockItems(normalizedStock);
     } catch (error) {
       console.error('Erro ao carregar estoque:', error);
+      Alert.alert('Erro', 'Não foi possível carregar o estoque');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Carregar serviços para o dropdown
-  const loadServices = async () => {
+  const handleAddItem = async (itemData) => {
     try {
-      const templates = await AsyncStorage.getItem('serviceTemplates');
-      if (templates) {
-        setServices(JSON.parse(templates));
+      const payload = {
+        name: itemData.name,
+        description: itemData.description || '',
+        category: itemData.category || 'Geral',
+        quantity: parseFloat(itemData.quantity) || 0,
+        unit: itemData.unit || 'un',
+        costPrice: parseFloat(itemData.costPrice) || 0,
+        sellingPrice: parseFloat(itemData.sellingPrice) || 0,
+        minStock: parseFloat(itemData.minStock) || 0,
+        photoUrl: itemData.photoUrl || null
+      };
+      
+      await api.post('/inventory', payload);
+      await loadStockItems();
+      setAddModalVisible(false);
+      
+      if (payload.quantity === 0) {
+        Alert.alert('Atenção!', `O item "${payload.name}" foi cadastrado com quantidade 0.`);
       }
     } catch (error) {
-      console.error('Erro ao carregar serviços:', error);
+      console.error('Erro ao adicionar item:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o item');
     }
   };
 
-  // Salvar itens do estoque
-  const saveStockItems = async (items) => {
-    try {
-      await SecureStore.setItemAsync(STOCK_STORAGE_KEY, JSON.stringify(items));
-      setStockItems(items);
-    } catch (error) {
-      console.error('Erro ao salvar estoque:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o item do estoque');
-    }
-  };
-
-  // Gerar ID único para item
-  const generateItemId = () => {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  };
-
-  // Adicionar novo item
-  const handleAddItem = async (itemData) => {
-    const newItem = {
-      ...itemData,
-      id: generateItemId(),
-      createdAt: new Date().toISOString(),
-      usageHistory: []
-    };
-
-    const updatedItems = [...stockItems, newItem];
-    await saveStockItems(updatedItems);
-    setAddModalVisible(false);
-
-    // Alerta se quantidade for 0
-    if (newItem.quantity === 0) {
-      Alert.alert(
-        'Atenção!', 
-        `O item "${newItem.name}" foi cadastrado com quantidade 0.`,
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  // Editar item existente
   const handleEditItem = async (itemData) => {
-    const updatedItems = stockItems.map(item => 
-      item.id === itemData.id ? itemData : item
-    );
-    await saveStockItems(updatedItems);
-    setDetailsModalVisible(false);
-    setSelectedItem(null);
+    try {
+      const payload = {
+        name: itemData.name,
+        description: itemData.description || '',
+        category: itemData.category || 'Geral',
+        quantity: parseFloat(itemData.quantity) || 0,
+        unit: itemData.unit || 'un',
+        costPrice: parseFloat(itemData.costPrice) || 0,
+        sellingPrice: parseFloat(itemData.sellingPrice) || 0,
+        minStock: parseFloat(itemData.minStock) || 0,
+        photoUrl: itemData.photoUrl
+      };
+      
+      await api.put(`/inventory/${itemData.id}`, payload);
+      await loadStockItems();
+      setDetailsModalVisible(false);
+      setSelectedItem(null);
+    } catch (error) {
+      console.error('Erro ao editar item:', error);
+      Alert.alert('Erro', 'Não foi possível editar o item');
+    }
   };
 
-  // Deletar item
   const handleDeleteItem = (item) => {
     Alert.alert(
       'Confirmar exclusão',
@@ -119,8 +118,13 @@ const StockScreen = ({ navigation }) => {
           text: 'Excluir', 
           style: 'destructive',
           onPress: async () => {
-            const updatedItems = stockItems.filter(i => i.id !== item.id);
-            await saveStockItems(updatedItems);
+            try {
+              await api.delete(`/inventory/${item.id}`);
+              await loadStockItems();
+            } catch (error) {
+              console.error('Erro ao deletar item:', error);
+              Alert.alert('Erro', 'Não foi possível deletar o item');
+            }
           }
         }
       ]

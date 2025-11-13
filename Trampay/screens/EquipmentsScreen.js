@@ -10,96 +10,94 @@ import {
   Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
 import AddEquipmentModal from '../components/AddEquipmentModal';
 import EquipmentDetailsModal from '../components/EquipmentDetailsModal';
 
 const EquipmentsScreen = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('list'); // 'list' ou 'settings'
+  const [activeTab, setActiveTab] = useState('list');
   const [equipments, setEquipments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
-  const [services, setServices] = useState([]); // Para o dropdown de serviços
+  const [loading, setLoading] = useState(false);
 
-  // Chave de armazenamento
-  const EQUIPMENTS_STORAGE_KEY = 'trampay_equipments';
-
-  // Carregar dados iniciais
   useEffect(() => {
     loadEquipments();
-    loadServices();
   }, []);
 
-  // Carregar equipamentos
   const loadEquipments = async () => {
     try {
-      const stored = await SecureStore.getItemAsync(EQUIPMENTS_STORAGE_KEY);
-      if (stored) {
-        const items = JSON.parse(stored);
-        setEquipments(items);
-      }
+      setLoading(true);
+      const response = await api.get('/equipment');
+      const rawItems = response.data.items || [];
+      
+      const normalizedEquipments = rawItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        category: item.category || 'Equipamento',
+        purchaseDate: item.purchase_date || '',
+        purchasePrice: item.purchase_price || 0,
+        status: item.status || 'active',
+        photoUrl: item.photo_url || '',
+        createdAt: item.created_at
+      }));
+      
+      setEquipments(normalizedEquipments);
     } catch (error) {
       console.error('Erro ao carregar equipamentos:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os equipamentos');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Carregar serviços para o dropdown
-  const loadServices = async () => {
-    try {
-      const templates = await AsyncStorage.getItem('serviceTemplates');
-      if (templates) {
-        setServices(JSON.parse(templates));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar serviços:', error);
-    }
-  };
-
-  // Salvar equipamentos
-  const saveEquipments = async (items) => {
-    try {
-      await SecureStore.setItemAsync(EQUIPMENTS_STORAGE_KEY, JSON.stringify(items));
-      setEquipments(items);
-    } catch (error) {
-      console.error('Erro ao salvar equipamentos:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o equipamento');
-    }
-  };
-
-  // Gerar ID único para equipamento
-  const generateEquipmentId = () => {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  };
-
-  // Adicionar novo equipamento
   const handleAddEquipment = async (equipmentData) => {
-    const newEquipment = {
-      ...equipmentData,
-      id: generateEquipmentId(),
-      createdAt: new Date().toISOString(),
-      usageHistory: []
-    };
-
-    const updatedEquipments = [...equipments, newEquipment];
-    await saveEquipments(updatedEquipments);
-    setAddModalVisible(false);
+    try {
+      const payload = {
+        name: equipmentData.name,
+        description: equipmentData.description || '',
+        category: equipmentData.category || 'Equipamento',
+        purchaseDate: equipmentData.purchaseDate || null,
+        purchasePrice: parseFloat(equipmentData.purchasePrice) || 0,
+        status: equipmentData.status || 'active',
+        photoUrl: equipmentData.photoUrl || null
+      };
+      
+      await api.post('/equipment', payload);
+      await loadEquipments();
+      setAddModalVisible(false);
+    } catch (error) {
+      console.error('Erro ao adicionar equipamento:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o equipamento');
+    }
   };
 
-  // Editar equipamento existente
   const handleEditEquipment = async (equipmentData) => {
-    const updatedEquipments = equipments.map(equipment => 
-      equipment.id === equipmentData.id ? equipmentData : equipment
-    );
-    await saveEquipments(updatedEquipments);
-    setDetailsModalVisible(false);
-    setSelectedEquipment(null);
+    try {
+      const payload = {
+        name: equipmentData.name,
+        description: equipmentData.description || '',
+        category: equipmentData.category || 'Equipamento',
+        purchaseDate: equipmentData.purchaseDate,
+        purchasePrice: parseFloat(equipmentData.purchasePrice) || 0,
+        status: equipmentData.status || 'active',
+        photoUrl: equipmentData.photoUrl
+      };
+      
+      await api.put(`/equipment/${equipmentData.id}`, payload);
+      await loadEquipments();
+      setDetailsModalVisible(false);
+      setSelectedEquipment(null);
+    } catch (error) {
+      console.error('Erro ao editar equipamento:', error);
+      Alert.alert('Erro', 'Não foi possível editar o equipamento');
+    }
   };
 
-  // Deletar equipamento
   const handleDeleteEquipment = (equipment) => {
     Alert.alert(
       'Confirmar exclusão',
@@ -110,8 +108,13 @@ const EquipmentsScreen = ({ navigation }) => {
           text: 'Excluir', 
           style: 'destructive',
           onPress: async () => {
-            const updatedEquipments = equipments.filter(e => e.id !== equipment.id);
-            await saveEquipments(updatedEquipments);
+            try {
+              await api.delete(`/equipment/${equipment.id}`);
+              await loadEquipments();
+            } catch (error) {
+              console.error('Erro ao deletar equipamento:', error);
+              Alert.alert('Erro', 'Não foi possível deletar o equipamento');
+            }
           }
         }
       ]

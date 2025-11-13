@@ -12,10 +12,9 @@ import {
   Alert,
   FlatList
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
-import SecureStorage from '../utils/SecureStorage';
 
 // Componentes
 import AddClientModal from '../components/AddClientModal';
@@ -30,22 +29,10 @@ const ClientsScreen = ({ navigation }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Carrega clientes salvos ao iniciar
   useEffect(() => {
     loadClients();
-  }, []);
-
-  // Executa migração de dados na inicialização
-  useEffect(() => {
-    const performMigration = async () => {
-      try {
-        await SecureStorage.migrateExistingData('userClients');
-      } catch (error) {
-        console.error('Erro na migração de dados de clientes:', error);
-      }
-    };
-    performMigration();
   }, []);
 
   // Filtra clientes baseado na pesquisa
@@ -55,38 +42,28 @@ const ClientsScreen = ({ navigation }) => {
 
   const loadClients = async () => {
     try {
-      const clientsData = await SecureStorage.getItem('userClients');
-      if (clientsData) {
-        setClients(clientsData);
-        setFilteredClients(clientsData);
-      }
+      setLoading(true);
+      const response = await api.get('/clients');
+      const rawClients = response.data.items || [];
+      
+      const normalizedClients = rawClients.map(client => ({
+        id: client.id,
+        name: client.name,
+        email: client.contact_email || '',
+        phone: client.contact_phone || '',
+        cpf: client.cpf || '',
+        address: client.address || '',
+        notes: client.notes || '',
+        createdAt: client.created_at
+      }));
+      
+      setClients(normalizedClients);
+      setFilteredClients(normalizedClients);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      // Fallback para AsyncStorage em caso de erro
-      try {
-        const savedClients = await AsyncStorage.getItem('userClients');
-        if (savedClients) {
-          const fallbackData = JSON.parse(savedClients);
-          setClients(fallbackData);
-          setFilteredClients(fallbackData);
-        }
-      } catch (fallbackError) {
-        console.error('Erro no fallback:', fallbackError);
-      }
-    }
-  };
-
-  const saveClients = async (clientsData) => {
-    try {
-      await SecureStorage.setItem('userClients', clientsData);
-    } catch (error) {
-      console.error('Erro ao salvar clientes com criptografia:', error);
-      // Em caso de erro crítico, não salva dados sensíveis sem criptografia
-      Alert.alert(
-        'Erro de Segurança',
-        'Não foi possível salvar os dados de forma segura. Por favor, tente novamente.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Erro', 'Não foi possível carregar os clientes');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,23 +83,25 @@ const ClientsScreen = ({ navigation }) => {
     setFilteredClients(filtered);
   };
 
-  // Função para adicionar novo cliente
-  const handleAddClient = (clientData) => {
-    const newClient = {
-      id: Date.now().toString(),
-      ...clientData,
-      createdAt: new Date().toISOString()
-    };
-    
-    const updatedClients = [...clients, newClient];
-    setClients(updatedClients);
-    saveClients(updatedClients);
-    setModalVisible(false);
-    
-    Alert.alert('Sucesso', 'Cliente adicionado com sucesso!');
+  const handleAddClient = async (clientData) => {
+    try {
+      const payload = {
+        name: clientData.name,
+        contactEmail: clientData.email || null,
+        contactPhone: clientData.phone || null,
+        notes: clientData.notes || null
+      };
+      
+      await api.post('/clients', payload);
+      await loadClients();
+      setModalVisible(false);
+      Alert.alert('Sucesso', 'Cliente adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o cliente');
+    }
   };
 
-  // Função para excluir cliente
   const handleDeleteClient = (clientId) => {
     const client = clients.find(c => c.id === clientId);
     
@@ -130,18 +109,19 @@ const ClientsScreen = ({ navigation }) => {
       'Excluir Cliente',
       `Tem certeza que deseja excluir ${client?.name}?`,
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel'
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Excluir',
           style: 'destructive',
-          onPress: () => {
-            const updatedClients = clients.filter(c => c.id !== clientId);
-            setClients(updatedClients);
-            saveClients(updatedClients);
-            Alert.alert('Sucesso', 'Cliente removido com sucesso!');
+          onPress: async () => {
+            try {
+              await api.delete(`/clients/${clientId}`);
+              await loadClients();
+              Alert.alert('Sucesso', 'Cliente removido com sucesso!');
+            } catch (error) {
+              console.error('Erro ao excluir cliente:', error);
+              Alert.alert('Erro', 'Não foi possível excluir o cliente');
+            }
           }
         }
       ]
@@ -176,18 +156,24 @@ const ClientsScreen = ({ navigation }) => {
     );
   };
 
-  // Função para editar cliente existente
-  const handleEditClient = (updatedClient) => {
-    const updatedClients = clients.map(client => 
-      client.id === updatedClient.id ? updatedClient : client
-    );
-    
-    setClients(updatedClients);
-    saveClients(updatedClients);
-    setEditModalVisible(false);
-    setSelectedClient(null);
-    
-    Alert.alert('Sucesso', 'Cliente atualizado com sucesso!');
+  const handleEditClient = async (updatedClient) => {
+    try {
+      const payload = {
+        name: updatedClient.name,
+        contactEmail: updatedClient.email || null,
+        contactPhone: updatedClient.phone || null,
+        notes: updatedClient.notes || null
+      };
+      
+      await api.put(`/clients/${updatedClient.id}`, payload);
+      await loadClients();
+      setEditModalVisible(false);
+      setSelectedClient(null);
+      Alert.alert('Sucesso', 'Cliente atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao editar cliente:', error);
+      Alert.alert('Erro', 'Não foi possível editar o cliente');
+    }
   };
 
   const renderClientItem = ({ item: client }) => (
