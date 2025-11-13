@@ -55,7 +55,7 @@ namespace TrampayBackend.Controllers
                 if (string.IsNullOrEmpty(user.password_hash) || !BCrypt.Net.BCrypt.Verify(senha, user.password_hash))
                     return BadRequest(new { error = "Credenciais inválidas" });
 
-                var token = GenerateJwt(user.id);
+                var token = GenerateJwt((long)user.id);
 
                 // Retorna token + perfil completo + isPro (batch otimizado!)
                 return Ok(new
