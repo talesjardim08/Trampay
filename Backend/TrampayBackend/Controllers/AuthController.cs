@@ -49,7 +49,7 @@ namespace TrampayBackend.Controllers
                 
                 var user = await _db.QueryFirstOrDefaultAsync<dynamic>(sql, new { Email = email });
 
-                if (user == null || user.is_active != 1)
+                if (user == null || !Convert.ToBoolean(user.is_active))
                     return BadRequest(new { error = "Credenciais inválidas" });
 
                 if (string.IsNullOrEmpty(user.password_hash) || !BCrypt.Net.BCrypt.Verify(senha, user.password_hash))
@@ -73,7 +73,7 @@ namespace TrampayBackend.Controllers
                         phone = (string)user.phone,
                         addressCity = (string)user.address_city,
                         addressState = (string)user.address_state,
-                        isPro = user.is_pro == 1
+                        isPro = Convert.ToBoolean(user.is_pro)
                     }
                 });
             }
