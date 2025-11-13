@@ -85,13 +85,6 @@ const SplashScreen = ({ onFinish }) => {
         />
       </Animated.View>
 
-      {/* Nome do app */}
-      <Animated.Text 
-        style={[styles.appName, { opacity: textOpacity }]}
-      >
-        Trampay
-      </Animated.Text>
-
       {/* Indicador de carregamento */}
       <Animated.View 
         style={[styles.loadingContainer, { opacity: textOpacity }]}
@@ -151,14 +144,6 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 200,
     height: 200,
-  },
-  
-  appName: {
-    fontSize: 32,
-    fontFamily: fonts.bold,
-    color: colors.primary,
-    marginBottom: spacing.xl,
-    letterSpacing: 1,
   },
   
   loadingContainer: {
