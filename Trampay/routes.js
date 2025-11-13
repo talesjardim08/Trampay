@@ -1,10 +1,7 @@
-// Sistema de roteamento centralizado do Trampay
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
-// Importação das telas
 import SplashScreen from './SplashScreen';
 import LoginScreen from './LoginScreen';
 import CreateAccountScreen from './CreateAccountScreen';
@@ -12,12 +9,10 @@ import ForgotPasswordScreen from './ForgotPasswordScreen';
 import TwoFactorAuthScreen from './TwoFactorAuthScreen';
 import HomeScreen from './HomeScreen';
 
-// Importação dos componentes
 import SideMenu from './components/SideMenu';
 import EditProfileScreen from './screens/EditProfileScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 
-// Importação das telas de negócio
 import MyBusinessScreen from './screens/MyBussinessScreen';
 import ServicesScreen from './screens/ServicesScreen';
 import ClientsScreen from './screens/ClientScreen';
@@ -27,32 +22,22 @@ import EquipmentsScreen from './screens/EquipmentsScreen';
 import CashFlowScreen from './screens/CashFlowScreen';
 import PricingScreen from './screens/PricingScreen';
 
-// Importação das telas de Trading
 import TradingHomeScreen from './screens/TradingHomeScreen';
 import CurrencyScreen from './screens/CurrencyScreen';
 import CryptoScreen from './screens/CryptoScreen';
 import StocksScreen from './screens/StocksScreen';
 
-// Importação da tela de Simulador de Impostos
 import TaxSimulatorScreen from './screens/TaxSimulatorScreen';
 
 const Stack = createStackNavigator();
 
-// Componente principal de navegação
-const AppRoutes = ({ 
-  isLoading = true, 
-  isAuthenticated = false,
-  onSplashFinish,
-  onLogin,
-  onCreateAccount,
-  user
-}) => {
+const AppRoutes = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
-          headerShown: false, // Remove header padrão para design customizado
+          headerShown: false,
           gestureEnabled: true,
           cardStyleInterpolator: ({ current, layouts }) => {
             return {
@@ -70,103 +55,69 @@ const AppRoutes = ({
           },
         }}
       >
-        {/* Tela Splash - Primeira tela mostrada */}
         <Stack.Screen 
           name="Splash" 
+          component={SplashScreen}
           options={{ 
             animationEnabled: false,
             gestureEnabled: false 
           }}
-        >
-          {props => (
-            <SplashScreen 
-              {...props} 
-              onFinish={onSplashFinish}
-            />
-          )}
-        </Stack.Screen>
+        />
 
-        {/* Tela de Login */}
         <Stack.Screen 
           name="Login"
+          component={LoginScreen}
           options={{ title: 'Login' }}
-        >
-          {props => (
-            <LoginScreen 
-              {...props} 
-              onLogin={onLogin}
-            />
-          )}
-        </Stack.Screen>
+        />
 
-        {/* Tela de Criação de Conta */}
         <Stack.Screen 
           name="CreateAccount"
+          component={CreateAccountScreen}
           options={{ 
             title: 'Criar Conta',
             headerShown: false
           }}
-        >
-          {props => (
-            <CreateAccountScreen 
-              {...props} 
-              onCreateAccount={onCreateAccount}
-            />
-          )}
-        </Stack.Screen>
+        />
 
-        {/* Tela de Esqueci a Senha */}
         <Stack.Screen 
           name="ForgotPassword"
+          component={ForgotPasswordScreen}
           options={{ 
             title: 'Esqueci a Senha',
             headerShown: false
           }}
-          component={ForgotPasswordScreen}
         />
 
-        {/* Tela de Verificação em Duas Etapas */}
         <Stack.Screen 
           name="TwoFactorAuth"
+          component={TwoFactorAuthScreen}
           options={{ 
             title: 'Verificação 2FA',
             headerShown: false
           }}
-          component={TwoFactorAuthScreen}
         />
 
-        {/* Tela Home - será implementada nas próximas fases */}
         <Stack.Screen 
           name="Home"
+          component={HomeScreen}
           options={{ 
             title: 'Home',
             headerShown: false,
             gestureEnabled: false
           }}
-        >
-          {props => (
-            <HomeScreen {...props} user={user} />
-          )}
-        </Stack.Screen>
+        />
 
-        {/* Novas telas funcionais */}
         <Stack.Screen 
           name="SideMenu" 
+          component={SideMenu}
           options={{ headerShown: false, presentation: 'modal' }}
-        >
-          {props => (
-            <SideMenu {...props} user={user} />
-          )}
-        </Stack.Screen>
+        />
         
         <Stack.Screen 
           name="EditProfile" 
+          component={EditProfileScreen}
           options={{ headerShown: false }}
-        >
-          {props => (
-            <EditProfileScreen {...props} user={user} />
-          )}
-        </Stack.Screen>
+        />
         
         <Stack.Screen 
           name="Notifications" 

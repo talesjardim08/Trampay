@@ -3,7 +3,7 @@
 // a lógica de integração com a API (GET /auth/me, GET/POST /transactions),
 // sincronização com SecureStore/AsyncStorage, tratamento de erros e logs detalhados.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
   View,
   Text,
@@ -25,12 +25,13 @@ import axios from 'axios';
 import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
+import { AuthContext } from './AuthContext';
 
 const { width } = Dimensions.get('window');
 
-const HomeScreen = ({ navigation, user, route }) => {
-  // Pega dados do usuário dos parâmetros da rota ou props
-  const currentUser = route?.params?.user || user;
+const HomeScreen = ({ navigation, route }) => {
+  const { user: contextUser, isPro } = useContext(AuthContext);
+  const currentUser = contextUser || route?.params?.user;
 
   // Estados para filtros e dados
   const [activeTab, setActiveTab] = useState('Dashboard');
