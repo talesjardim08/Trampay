@@ -239,8 +239,54 @@ Preferred communication style: Simple, everyday language.
 - **Frontend:** ✅ Compilado sem erros
 - **Próximo:** Usuário testar fluxo completo de cadastro com políticas
 
-**Pendente Usuário:**
+**Verificação de Conexões Backend (13/11/2025):**
+
+**✅ TELAS CONECTADAS AO BACKEND:**
+1. **IAScreen** - Totalmente funcional
+   - `/api/ai/chat` - Chat com HuggingFace
+   - `/api/ai/image` - OCR com OCR.space
+   - Proteção PRO ativa
+   
+2. **EditProfileScreen** - Funcional
+   - `PUT /api/auth/profile` - Atualizar perfil
+   
+3. **Auth Screens** - Funcionais
+   - `POST /api/auth/login` - Login otimizado (batch)
+   - `POST /api/auth/register` - Cadastro
+   - `POST /api/auth/forgot-password` - Recuperação
+   
+4. **HomeScreen** - Parcialmente conectado
+   - Usa AsyncStorage para cache
+   - Precisa verificar sincronização com backend
+
+**❌ TELAS DESCONECTADAS (USANDO STORAGE LOCAL):**
+1. **StockScreen** → Backend pronto: `InventoryController` (/api/inventory)
+   - Usa `SecureStore.getItemAsync('trampay_stock_items')`
+   - PRECISA conectar ao backend
+   
+2. **EquipmentsScreen** → Backend pronto: `EquipmentController` (/api/equipment)
+   - Usa `SecureStore.getItemAsync('trampay_equipments')`
+   - PRECISA conectar ao backend
+   
+3. **ClientScreen** → Backend pronto: `ClientsController` (/api/clients)
+   - Usa `SecureStorage.getItem('userClients')`
+   - PRECISA conectar ao backend
+   
+4. **ServicesScreen** → Backend pronto: `ServicesController` (/api/services)
+   - Usa `SecureStorage.getItem('userServices')`
+   - PRECISA conectar ao backend
+   
+5. **CalendarScreen/Events** → Backend pronto: `EventsController` (/api/events)
+   - Usa storage local
+   - PRECISA conectar ao backend
+
+**RESUMO:**
+- ✅ 3 áreas funcionais conectadas (IA, Perfil, Auth)
+- ❌ 5 áreas usando storage local (precisam migração para backend)
+- 📊 Backend 100% pronto com todos controllers
+- 🎯 Próximo: Migrar telas de Stock, Equipment, Client, Services, Events para API
+
+**Pendente:**
 1. Executar `Backend/add_missing_tables.sql` no phpMyAdmin AlwaysData
-2. Testar fluxo de cadastro (verificar modal de políticas + checkbox)
-3. Testar login otimizado (performance)
-4. Validar novos endpoints `/api/inventory`, `/api/equipment`, `/api/events`, `/api/analytics`
+2. Conectar 5 telas desconectadas ao backend (Stock, Equipment, Client, Services, Events)
+3. Testar fluxo completo end-to-end após conexões
