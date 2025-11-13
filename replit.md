@@ -172,68 +172,59 @@ Preferred communication style: Simple, everyday language.
 4. Image upload (equipment/stock photos) uses local storage, no cloud integration
 ---
 
-## Recent Changes (12/11/2025)
+## Recent Changes (13/11/2025)
 
-### Integração Completa Frontend + Backend Render
+### Migração AsyncStorage + Sistema PRO Completo
 
-**Configuração da API:**
-- Frontend agora usa `https://trampay.onrender.com/api` (backend em produção)
-- Configurado em: `services/api.js` e `authService.js`
+**Migração de Storage (Cross-Platform):**
+- ✅ Migração completa de SecureStore → AsyncStorage em TODOS os arquivos
+- ✅ Compatibilidade web + mobile garantida
+- ✅ Arquivos migrados: `AuthContext.js`, `authService.js`, `api.js`, `CryptoScreen.js`, `CurrencyScreen.js`, `PricingScreen.js`, `TradingHomeScreen.js`, `StocksScreen.js`
+- ✅ Todos imports duplicados removidos
+- ✅ Frontend compilando sem erros (767 módulos)
 
-**Bug Crítico Corrigido:**
-- Token storage mismatch resolvido (agora usa SecureStore consistentemente)
-- Todas APIs autenticadas funcionando (perfil, PRO, IA)
+**Sistema de Proteção PRO:**
+- ✅ HOC `withPremiumProtection` aplicado em 5 telas premium:
+  1. **CryptoScreen** - Índices de criptomoedas
+  2. **CurrencyScreen** - Câmbio e moedas
+  3. **PricingScreen** - Tabela de preços
+  4. **TradingHomeScreen** - Trading e investimentos
+  5. **StocksScreen** - Ações e mercado
+- ✅ Verificação automática de assinatura PRO
+- ✅ Redirecionamento para `AssineProScreen` se não-PRO
+- ✅ Todas telas protegidas funcionando sem erros
 
-**AuthContext Melhorado:**
-- Carregamento automático de perfil do usuário
-- Status premium (`isPro`) sincronizado com backend
-- `activatePro()`: integrado com `/api/subscription/activate`
-- `setUser()`: exportado para atualizações de perfil
-- Logout completo: limpa SecureStore + AsyncStorage
-
-**Telas Implementadas:**
-1. **IAScreen** (nova): Chat com IA + OCR de imagens
-   - Histórico salvo em `ai_chats` e `ai_messages`
-   - Verificação de assinatura PRO
-   - Interface completa com bubbles e loading states
-
-2. **AssineProScreen** (reescrita): Ativação de PRO
-   - Integrada com `/api/subscription/activate`
-   - Verifica se usuário já é PRO
-
-3. **EditProfileScreen** (integrada): Edição de perfil
-   - GET/PUT `/api/auth/profile`
-   - Edita: nome, email, telefone, senha
-
-**SideMenu (Drawer):**
-- Reescrito para usar AuthContext
-- Navegação PRO funcional (bloqueia e redireciona)
-- Layout corrigido e alinhado
-
-**Sistema de Bloqueio PRO:**
-- HOC `withPremiumProtection`: protege qualquer tela
-- Verificação automática de `isPro`
-- Redirecionamento para AssineProScreen
-
-**Backend:**
-- Criado `migration_ai_tables.sql` para tabelas de IA
-- Tabelas: `ai_chats`, `ai_messages`
-- **PENDENTE:** Executar SQL no AlwaysData (phpMyAdmin)
+**SQL Migration (Banco de Dados):**
+- ✅ Criado `Backend/add_missing_tables.sql` com 5 tabelas faltantes:
+  1. `schedules` - Agendamentos
+  2. `ai_chats` - Conversas com IA
+  3. `ai_messages` - Mensagens do chat IA
+  4. `password_resets` - Recuperação de senha
+  5. `events` - Eventos do calendário
+- ✅ Todas tabelas com `CREATE TABLE IF NOT EXISTS`
+- ✅ Foreign keys corretos com `ON DELETE CASCADE`
+- ✅ Indexes otimizados para performance
+- ✅ Compatível com controllers backend existentes
+- ✅ Instruções de execução em `INSTRUCOES_BANCO_DADOS.md`
+- **PENDENTE:** Usuário executar SQL no phpMyAdmin AlwaysData
 
 **Arquivos Modificados:**
-- `Trampay/services/api.js`
-- `Trampay/authService.js`
 - `Trampay/AuthContext.js`
-- `Trampay/routes.js`
-- `Trampay/components/SideMenu.js`
-- `Trampay/screens/AssineProScreen.js`
-- `Trampay/screens/IAScreen.js` (novo)
-- `Trampay/screens/EditProfileScreen.js`
-- `Trampay/screens/hocs/withPremiumProtection.js`
-- `Backend/migration_ai_tables.sql` (novo)
+- `Trampay/authService.js`
+- `Trampay/services/api.js`
+- `Trampay/screens/CryptoScreen.js`
+- `Trampay/screens/CurrencyScreen.js`
+- `Trampay/screens/PricingScreen.js`
+- `Trampay/screens/TradingHomeScreen.js`
+- `Trampay/screens/StocksScreen.js`
 
-**Próximas Ações Necessárias:**
-1. Executar SQL das tabelas de IA no AlwaysData
-2. Testar backend no Render (https://trampay.onrender.com/health)
-3. Testar fluxo completo: login → perfil → PRO → IA
-4. Fazer commit e push para GitHub
+**Novos Arquivos:**
+- `Backend/add_missing_tables.sql` - SQL migration production-ready
+- `INSTRUCOES_BANCO_DADOS.md` - Guia passo-a-passo para usuário
+
+**Próximos Passos:**
+1. **Usuário:** Executar `Backend/add_missing_tables.sql` no AlwaysData (instruções no `INSTRUCOES_BANCO_DADOS.md`)
+2. **Backend:** Criar endpoints faltantes (`/api/inventory`, `/api/equipment`, `/api/events`)
+3. **Performance:** Otimizar login (batch JWT + profile em 1 request)
+4. **Analytics:** Criar endpoints para mover cálculos de gráficos para backend
+5. **Testes:** Validar fluxo completo Login → Home → PRO → IA
