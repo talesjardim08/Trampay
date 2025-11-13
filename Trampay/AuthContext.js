@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from "react";
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from '-native-async-storage/async-storage';
 import { getUserProfile, login, logout, registerUser } from "./authService";
 import { Alert } from "react-native";
 import api from "./services/api";
@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const token = await SecureStore.getItemAsync("token");
+        const token = await AsyncStorage.getItem("token");
         if (token) {
           console.log("[AuthContext] Token encontrado, obtendo perfil...");
           const profile = await getUserProfile();
@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }) => {
   const activatePro = async () => {
     try {
       setLoading(true);
-      const token = await SecureStore.getItemAsync("token");
+      const token = await AsyncStorage.getItem("token");
       if (!token) {
         Alert.alert("❌ Erro", "Você precisa estar logado para ativar o PRO.");
         return;

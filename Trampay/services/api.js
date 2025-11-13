@@ -1,6 +1,6 @@
 // src/services/api.js
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Use produção do Render ou localhost (dev)
@@ -15,12 +15,12 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await SecureStore.getItemAsync('token');
+      const token = await AsyncStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (err) {
-      console.warn('Erro ao ler token do SecureStore', err);
+      console.warn('Erro ao ler token do AsyncStorage', err);
     }
     return config;
   },

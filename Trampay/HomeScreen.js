@@ -1,9 +1,9 @@
 // Tela Home do Trampay com Dashboard completo (integrada com backend + cache)
 // Mantive 100% dos imports, estrutura visual e estilos originais — só adicionei
 // a lógica de integração com a API (GET /auth/me, GET/POST /transactions),
-// sincronização com SecureStore/AsyncStorage, tratamento de erros e logs detalhados.
+// sincronização com AsyncStorage/AsyncStorage, tratamento de erros e logs detalhados.
 
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+// Removed AsyncStorage import - using AsyncStorage for all storage
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import axios from 'axios';
+import api from './services/api';
 import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
@@ -82,59 +82,9 @@ const HomeScreen = ({ navigation, route }) => {
   // Nome de usuário para exibição (mantendo comportamento original)
   const userName = (currentUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Usuário').toString();
 
-  // API client (local) — insere token automaticamente a partir do SecureStore
-  const API_BASE = 'https://trampay.onrender.com/api';
-  const apiRef = useRef(null);
+  // API client (local) — insere token automaticamente a partir do AsyncStorage
 
-  const initApiClient = async () => {
-    // cria instância axios e configura interceptor para inserir token
-    const token = await SecureStore.getItemAsync('token');
-    const instance = axios.create({
-      baseURL: API_BASE,
-      timeout: 15000,
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    // request interceptor to add token
-    instance.interceptors.request.use(
-      async (config) => {
-        try {
-          const t = token || (await SecureStore.getItemAsync('token'));
-          if (t) config.headers.Authorization = `Bearer ${t}`;
-        } catch (e) {
-          console.warn('[API] erro lendo token no interceptor', e);
-        }
-        return config;
-      },
-      (err) => Promise.reject(err)
-    );
-
-    apiRef.current = instance;
-  };
-
-  // Use ref to avoid re-creating the axios client multiple times
-  useEffect(() => {
-    initApiClient();
-  }, []);
-
-  // --- Helper: persist e read utilities (SecureStore + AsyncStorage) ---
-  const saveSecureData = async (key, data) => {
-    try {
-      await SecureStore.setItemAsync(key, JSON.stringify(data));
-    } catch (err) {
-      console.error(`[SecureStore] erro ao salvar ${key}:`, err);
-    }
-  };
-
-  const loadSecureData = async (key) => {
-    try {
-      const raw = await SecureStore.getItemAsync(key);
-      return raw ? JSON.parse(raw) : null;
-    } catch (err) {
-      console.error(`[SecureStore] erro ao carregar ${key}:`, err);
-      return null;
-    }
-  };
+  // --- Helper: persist e read utilities (AsyncStorage + AsyncStorage) ---
 
   const saveAsyncData = async (key, data) => {
     try {
@@ -159,16 +109,16 @@ const HomeScreen = ({ navigation, route }) => {
     setError(null);
     try {
       // Carrega transações locais (cache)
-      const savedTransactions = await loadSecureData(TRANSACTIONS_STORAGE_KEY);
+      const savedTransactions = await loadAsyncData(TRANSACTIONS_STORAGE_KEY);
       if (savedTransactions) {
-        console.log('[Home] carregando transações do SecureStore (cache). Quantidade:', savedTransactions.length);
+        console.log('[Home] carregando transações do AsyncStorage (cache). Quantidade:', savedTransactions.length);
         setUserTransactions(savedTransactions);
       } else {
-        console.log('[Home] sem transações locais no SecureStore.');
+        console.log('[Home] sem transações locais no AsyncStorage.');
       }
 
       // Carrega saldo local
-      const savedBalance = await loadSecureData(BALANCE_STORAGE_KEY);
+      const savedBalance = await loadAsyncData(BALANCE_STORAGE_KEY);
       if (savedBalance != null) {
         const parsed = parseFloat(savedBalance);
         setBalance(Number.isNaN(parsed) ? 0 : parsed);
@@ -192,12 +142,8 @@ const HomeScreen = ({ navigation, route }) => {
 
   // --- Fetch profile from backend
   const fetchProfileFromServer = async () => {
-    if (!apiRef.current) {
-      console.warn('[Home] apiRef não inicializada antes de fetchProfileFromServer');
-      return null;
-    }
     try {
-      const resp = await apiRef.current.get('/auth/me');
+      const resp = await api.get('/auth/me');
       console.log('[Home] perfil obtido do servidor:', resp?.data?.displayName || resp?.data?.email);
       return resp.data;
     } catch (err) {
@@ -208,13 +154,9 @@ const HomeScreen = ({ navigation, route }) => {
 
   // --- Fetch transactions from backend
   const fetchTransactionsFromServer = async (params = {}) => {
-    if (!apiRef.current) {
-      console.warn('[Home] apiRef não inicializada antes de fetchTransactionsFromServer');
-      return null;
-    }
     try {
       // envia query params se houver
-      const resp = await apiRef.current.get('/transactions', { params });
+      const resp = await api.get('/transactions', { params });
       if (resp?.data) {
         console.log('[Home] transações obtidas do servidor:', resp.data.length);
         return resp.data;
@@ -228,10 +170,6 @@ const HomeScreen = ({ navigation, route }) => {
 
   // --- Post transaction to server
   const postTransactionToServer = async (transaction) => {
-    if (!apiRef.current) {
-      console.warn('[Home] apiRef não inicializada antes de postTransactionToServer');
-      return { success: false, error: 'API cliente não iniciado' };
-    }
     try {
       const payload = {
         // mantém a estrutura mínima esperada — ajuste campo a campo conforme backend
@@ -245,7 +183,7 @@ const HomeScreen = ({ navigation, route }) => {
         metadata: transaction.metadata || {},
       };
 
-      const resp = await apiRef.current.post('/transactions', payload);
+      const resp = await api.post('/transactions', payload);
       console.log('[Home] POST /transactions sucesso — servidor retornou:', resp?.data?.id || 'sem id');
       return { success: true, data: resp.data };
     } catch (err) {
@@ -267,10 +205,6 @@ const HomeScreen = ({ navigation, route }) => {
   };
 
   const flushOutbox = async () => {
-    if (!apiRef.current) {
-      console.warn('[Home] apiRef não inicializada antes de flushOutbox');
-      return;
-    }
     setSyncing(true);
     try {
       const outbox = (await loadAsyncData(OUTBOX_STORAGE_KEY)) || [];
@@ -298,11 +232,11 @@ const HomeScreen = ({ navigation, route }) => {
 
       // Se tiver transações bem-sucedidas, atualiza cache local para refletir IDs do servidor
       if (successful.length) {
-        const local = (await loadSecureData(TRANSACTIONS_STORAGE_KEY)) || [];
+        const local = (await loadAsyncData(TRANSACTIONS_STORAGE_KEY)) || [];
         // Merge: substitui itens locais por itens retornados pelo servidor se IDs coincidirem por algum campo
         // Aqui fazemos append seguro
         const merged = [...local, ...successful];
-        await saveSecureData(TRANSACTIONS_STORAGE_KEY, merged);
+        await saveAsyncData(TRANSACTIONS_STORAGE_KEY, merged);
         setUserTransactions(merged);
         console.log('[Home] outbox sincronizado — success:', successful.length, 'failed:', failed.length);
       }
@@ -315,10 +249,6 @@ const HomeScreen = ({ navigation, route }) => {
 
   // --- Reconcile server <-> local (fetch remoto e substituir/merge local se disponível)
   const syncFromServer = async () => {
-    if (!apiRef.current) {
-      console.warn('[Home] apiRef não inicializada antes de syncFromServer');
-      return;
-    }
     setSyncing(true);
     try {
       const remote = await fetchTransactionsFromServer();
@@ -342,8 +272,8 @@ const HomeScreen = ({ navigation, route }) => {
         metadata: r.metadata || {},
       }));
 
-      // Salva no SecureStore (substitui cache local pelos dados remotos)
-      await saveSecureData(TRANSACTIONS_STORAGE_KEY, normalized);
+      // Salva no AsyncStorage (substitui cache local pelos dados remotos)
+      await saveAsyncData(TRANSACTIONS_STORAGE_KEY, normalized);
       setUserTransactions(normalized);
       console.log('[Home] syncFromServer — cache atualizado com dados remotos. Total:', normalized.length);
     } catch (err) {
@@ -430,10 +360,10 @@ const HomeScreen = ({ navigation, route }) => {
         isRecurring: !!transactionData.isRecurring,
       };
 
-      // Atualiza estado local e SecureStore imediatamente (optimistic UI)
+      // Atualiza estado local e AsyncStorage imediatamente (optimistic UI)
       const updatedTransactions = [newTransaction, ...userTransactions];
       setUserTransactions(updatedTransactions);
-      await saveSecureData(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
+      await saveAsyncData(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
       console.log('[Home] transação salva localmente (optimistic):', newTransaction.id);
 
       // Se transação for recorrente ou se usuário estiver offline, coloque no outbox
@@ -459,7 +389,7 @@ const HomeScreen = ({ navigation, route }) => {
           : t
         );
         setUserTransactions(merged);
-        await saveSecureData(TRANSACTIONS_STORAGE_KEY, merged);
+        await saveAsyncData(TRANSACTIONS_STORAGE_KEY, merged);
         console.log('[Home] transação sincronizada com servidor:', serverTx.id || 'sem id retornado');
       } else {
         // Falhou: adiciona ao outbox para re-tentativa posterior
@@ -471,7 +401,7 @@ const HomeScreen = ({ navigation, route }) => {
       if (!newTransaction.isRecurring && newTransaction.currency === baseCurrency) {
         const newBalance = newTransaction.type === 'income' ? balance + newTransaction.amount : balance - newTransaction.amount;
         setBalance(newBalance);
-        await saveSecureData(BALANCE_STORAGE_KEY, newBalance.toString());
+        await saveAsyncData(BALANCE_STORAGE_KEY, newBalance.toString());
       }
 
       Alert.alert('Sucesso!', 'Transação adicionada e salva!');

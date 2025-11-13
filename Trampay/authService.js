@@ -1,6 +1,6 @@
 // src/screens/authService.js
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from '-native-async-storage/async-storage';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ---------------------------------------------
@@ -18,7 +18,7 @@ const api = axios.create({
 // ---------------------------------------------
 async function saveToken(token) {
   try {
-    await SecureStore.setItemAsync("token", token);
+    await AsyncStorage.setItem("token", token);
     console.log("[Auth] Token salvo com sucesso.");
   } catch (err) {
     console.error("Erro ao salvar token:", err);
@@ -135,7 +135,7 @@ export async function forgotPassword(payload) {
 // ---------------------------------------------
 export async function getUserProfile() {
   try {
-    const token = await SecureStore.getItemAsync("token");
+    const token = await AsyncStorage.getItem("token");
     if (!token) {
       console.warn("[Auth] Nenhum token encontrado. Usuário não autenticado.");
       return null;
@@ -158,7 +158,7 @@ export async function getUserProfile() {
 // ---------------------------------------------
 export async function logout() {
   try {
-    await SecureStore.deleteItemAsync("token");
+    await AsyncStorage.removeItem("token");
     // Limpa AsyncStorage chave a chave (remover userProfile também)
     await AsyncStorage.multiRemove([
       "transactions",
