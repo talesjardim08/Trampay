@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import api from './services/api';
 import { fetchBalance, adjustBalance } from './services/balanceService';
+import { fetchAnalyticsSummary, fetchExpensesByCategory, fetchRevenueByCategory } from './services/analyticsService';
 import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
@@ -137,6 +138,26 @@ const HomeScreen = ({ navigation, route }) => {
       setError('Erro ao carregar dados locais.');
     } finally {
       setLoading(false); // mostra UI mesmo que api remoto ainda não tenha respondido
+    }
+  };
+
+  // --- Load analytics data from backend
+  const loadAnalyticsData = async () => {
+    try {
+      const [summary, expensesByCategory, revenueByCategory] = await Promise.all([
+        fetchAnalyticsSummary(),
+        fetchExpensesByCategory(),
+        fetchRevenueByCategory()
+      ]);
+      
+      console.log('[Home] Analytics carregados do backend:', { summary, expensesByCategory, revenueByCategory });
+      
+      // Pode usar esses dados para atualizar o estado dos gráficos/cards se necessário
+      // Por hora apenas logamos para confirmar que funciona
+      return { summary, expensesByCategory, revenueByCategory };
+    } catch (error) {
+      console.error('[Home] Erro ao carregar analytics:', error);
+      return null;
     }
   };
 
@@ -303,6 +324,9 @@ const HomeScreen = ({ navigation, route }) => {
 
         // agora tentar obter dados "oficiais" do servidor e sobrescrever cache (se o servidor estiver ok)
         await syncFromServer();
+        
+        // Carrega dados analíticos do backend
+        await loadAnalyticsData();
       } catch (err) {
         console.error('[Home] erro na inicialização completa:', err);
       } finally {

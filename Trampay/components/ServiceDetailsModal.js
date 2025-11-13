@@ -35,8 +35,8 @@ const ServiceDetailsModal = ({ visible, onClose, service, onEdit, onDelete }) =>
       : { text: 'Não pago', color: '#FF5722', icon: 'money-off' };
   };
 
-  const statusInfo = getStatusInfo(service.status);
-  const paymentInfo = getPaymentInfo(service.paid);
+  const statusInfo = getStatusInfo(service?.status);
+  const paymentInfo = getPaymentInfo(service?.paid);
 
   return (
     <Modal
@@ -72,38 +72,38 @@ const ServiceDetailsModal = ({ visible, onClose, service, onEdit, onDelete }) =>
             
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Serviço:</Text>
-              <Text style={styles.infoValue}>{service.serviceName}</Text>
+              <Text style={styles.infoValue}>{service?.serviceName || 'N/A'}</Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Cliente:</Text>
-              <Text style={styles.infoValue}>{service.clientName}</Text>
+              <Text style={styles.infoValue}>{service?.clientName || 'N/A'}</Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Data:</Text>
               <Text style={styles.infoValue}>
-                {new Date(service.date).toLocaleDateString('pt-BR')}
+                {service?.date ? new Date(service.date).toLocaleDateString('pt-BR') : 'N/A'}
               </Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Horário:</Text>
-              <Text style={styles.infoValue}>{service.time}</Text>
+              <Text style={styles.infoValue}>{service?.time || 'N/A'}</Text>
             </View>
 
-            {service.description && (
+            {service?.description && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Descrição:</Text>
-                <Text style={styles.infoValue}>{service.description}</Text>
+                <Text style={styles.infoValue}>{service?.description}</Text>
               </View>
             )}
 
-            {service.price && (
+            {service?.price && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Preço:</Text>
                 <Text style={[styles.infoValue, styles.priceValue]}>
-                  R$ {service.price}
+                  R$ {service?.price || '0'}
                 </Text>
               </View>
             )}
@@ -139,21 +139,21 @@ const ServiceDetailsModal = ({ visible, onClose, service, onEdit, onDelete }) =>
           </View>
 
           {/* Equipment & Stock Card */}
-          {(service.equipment || service.stock) && (
+          {(service?.equipment || service?.stock) && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Recursos</Text>
               
-              {service.equipment && (
+              {service?.equipment && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Equipamentos:</Text>
-                  <Text style={styles.infoValue}>{service.equipment}</Text>
+                  <Text style={styles.infoValue}>{service?.equipment}</Text>
                 </View>
               )}
 
-              {service.stock && (
+              {service?.stock && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Produtos do estoque:</Text>
-                  <Text style={styles.infoValue}>{service.stock}</Text>
+                  <Text style={styles.infoValue}>{service?.stock}</Text>
                 </View>
               )}
             </View>
@@ -166,17 +166,17 @@ const ServiceDetailsModal = ({ visible, onClose, service, onEdit, onDelete }) =>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Criado em:</Text>
               <Text style={styles.infoValue}>
-                {new Date(service.createdAt).toLocaleString('pt-BR')}
+                {service?.createdAt ? new Date(service.createdAt).toLocaleString('pt-BR') : 'N/A'}
               </Text>
             </View>
 
-            {service.completedAt && (
+            {service?.completedAt && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>
-                  {service.status === 'completed' ? 'Concluído em:' : 'Cancelado em:'}
+                  {service?.status === 'completed' ? 'Concluído em:' : 'Cancelado em:'}
                 </Text>
                 <Text style={styles.infoValue}>
-                  {new Date(service.completedAt).toLocaleString('pt-BR')}
+                  {service?.completedAt ? new Date(service.completedAt).toLocaleString('pt-BR') : 'N/A'}
                 </Text>
               </View>
             )}
