@@ -22,6 +22,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { colors as baseColors, fonts, spacing } from '../styles'; // mantém seu arquivo de estilos, se algo faltar usamos valores locais
+import withPremiumProtection from './hocs/withPremiumProtection';
 
 const { width } = Dimensions.get('window');
 
@@ -717,4 +718,4 @@ const styles = StyleSheet.create({
   modalCloseText: { color: TRAMPAY_BLUE, fontWeight: '700' },
 });
 
-export default CurrencyScreen;
+export default withPremiumProtection(CurrencyScreen);

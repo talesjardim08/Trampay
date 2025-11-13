@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import withPremiumProtection from './hocs/withPremiumProtection';
 // se você usa um file ../styles, ele será ignorado em favor da paleta local — mantive import caso queira usar
 // import { colors as baseColors, fonts, spacing as baseSpacing } from '../styles';
 
@@ -860,4 +861,4 @@ const styles = StyleSheet.create({
   watchlistContainer: { marginTop: 8 },
 });
 
-export default StocksScreen;
+export default withPremiumProtection(StocksScreen);

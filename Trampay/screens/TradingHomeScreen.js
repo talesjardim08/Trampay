@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import withPremiumProtection from './hocs/withPremiumProtection';
 
 const colors = {
   background: '#F7F7F9',
@@ -25,7 +26,7 @@ const colors = {
   white: '#FFFFFF',
 };
 
-export default function TradingHomeScreen({ navigation }) {
+function TradingHomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [quickRates, setQuickRates] = useState({
     usd: 0,
@@ -291,3 +292,5 @@ const styles = StyleSheet.create({
   },
   quickActionText: { fontSize: 13, fontWeight: '600', color: colors.darkBlue, marginTop: 8 },
 });
+
+export default withPremiumProtection(TradingHomeScreen);

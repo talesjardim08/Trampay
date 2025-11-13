@@ -17,7 +17,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import withPremiumProtection from './hocs/withPremiumProtection';
 
 const colors = {
   background: '#F7F7F9',
@@ -166,10 +167,10 @@ const CryptoScreen = ({ navigation }) => {
   // --- Load favorites & watchlist from SecureStore ---
   const loadUserData = useCallback(async () => {
     try {
-      const storedFav = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
+      const storedFav = await AsyncStorage.getItem(FAVORITES_STORAGE_KEY);
       if (storedFav) setFavorites(JSON.parse(storedFav));
 
-      const storedWatch = await SecureStore.getItemAsync(WATCHLIST_STORAGE_KEY);
+      const storedWatch = await AsyncStorage.getItem(WATCHLIST_STORAGE_KEY);
       if (storedWatch) setWatchlist(JSON.parse(storedWatch));
     } catch (err) {
       console.error('Erro ao carregar dados do usuário:', err);
@@ -192,7 +193,7 @@ const CryptoScreen = ({ navigation }) => {
       ? favorites.filter((f) => f !== cryptoId)
       : [...favorites, cryptoId];
     try {
-      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFav));
+      await AsyncStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFav));
       setFavorites(newFav);
     } catch (err) {
       console.error('Erro ao salvar favoritos:', err);
@@ -209,7 +210,7 @@ const CryptoScreen = ({ navigation }) => {
       newWatch = [...watchlist, { ...crypto, added_at: new Date().toISOString() }];
     }
     try {
-      await SecureStore.setItemAsync(WATCHLIST_STORAGE_KEY, JSON.stringify(newWatch));
+      await AsyncStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(newWatch));
       setWatchlist(newWatch);
       if (exists) {
         // remover feedback
@@ -665,4 +666,5 @@ const styles = StyleSheet.create({
   emptyFavSub: { marginTop: 6, color: MUTED },
 });
 
-export default CryptoScreen;
+
+export default withPremiumProtection(CryptoScreen);

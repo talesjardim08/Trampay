@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
+import withPremiumProtection from './hocs/withPremiumProtection';
 
 const PricingScreen = ({ navigation }) => {
   const [monthlyCost, setMonthlyCost] = useState('');
@@ -520,4 +521,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PricingScreen;
+export default withPremiumProtection(PricingScreen);
