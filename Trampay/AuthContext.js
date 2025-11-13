@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from "react";
-import AsyncStorage from '-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserProfile, login, logout, registerUser } from "./authService";
 import { Alert } from "react-native";
 import api from "./services/api";

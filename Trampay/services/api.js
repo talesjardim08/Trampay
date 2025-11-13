@@ -1,6 +1,6 @@
 // src/services/api.js
 import axios from 'axios';
-import AsyncStorage from '-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Use produção do Render ou localhost (dev)

@@ -1,6 +1,5 @@
 // src/screens/authService.js
 import axios from "axios";
-import AsyncStorage from '-native-async-storage/async-storage';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ---------------------------------------------
