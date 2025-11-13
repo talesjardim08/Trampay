@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
+  Image,
   Animated, 
   StyleSheet, 
   Dimensions 
@@ -77,12 +78,11 @@ const SplashScreen = ({ onFinish }) => {
           }
         ]}
       >
-        {/* Logo simples usando View (será substituído por imagem real) */}
-        <View style={styles.logoBackground}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoText}>👤</Text>
-          </View>
-        </View>
+        <Image
+          source={require('./assets/logo_trampay_2025_2.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       {/* Nome do app */}
@@ -148,35 +148,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   
-  logoBackground: {
-    width: 120,
-    height: 120,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  
-  logoIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  logoText: {
-    fontSize: 40,
-    textAlign: 'center',
+  logoImage: {
+    width: 200,
+    height: 200,
   },
   
   appName: {

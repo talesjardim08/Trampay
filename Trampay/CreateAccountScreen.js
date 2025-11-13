@@ -26,6 +26,8 @@ export default function CreateAccountScreen({ navigation }) {
 
   const [showStatePicker, setShowStatePicker] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showPoliciesModal, setShowPoliciesModal] = useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
 
   const [form, setForm] = useState({
     accountType: 'pf',
@@ -64,6 +66,8 @@ export default function CreateAccountScreen({ navigation }) {
       return Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
     if (form.password !== form.confirmPassword)
       return Alert.alert('Erro', 'As senhas não conferem');
+    if (!acceptedPolicies)
+      return Alert.alert('Atenção', 'Você precisa aceitar as Políticas de Segurança e Privacidade para criar sua conta');
 
     try {
       setLoading(true);
@@ -209,6 +213,25 @@ export default function CreateAccountScreen({ navigation }) {
                 placeholder="Digite novamente"
               />
 
+              {/* Checkbox de Políticas */}
+              <View style={styles.checkboxContainer}>
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                  onPress={() => setAcceptedPolicies(!acceptedPolicies)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, acceptedPolicies && styles.checkboxActive]}>
+                    {acceptedPolicies && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Li e aceito as </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowPoliciesModal(true)}>
+                  <Text style={styles.policyLink}>
+                    Políticas de Segurança e Privacidade
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={loading}>
                 {loading ? (
                   <ActivityIndicator color={colors.primaryDark} />
@@ -271,6 +294,80 @@ export default function CreateAccountScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* MODAL DE POLÍTICAS */}
+      <Modal visible={showPoliciesModal} animationType="slide">
+        <SafeAreaView style={styles.policyModal}>
+          <View style={styles.policyHeader}>
+            <Text style={styles.policyTitle}>Políticas de Segurança e Privacidade</Text>
+            <TouchableOpacity onPress={() => setShowPoliciesModal(false)}>
+              <Text style={styles.policyClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.policyContent}>
+            <Text style={styles.policySection}>1. SEGURANÇA DA INFORMAÇÃO</Text>
+            <Text style={styles.policyText}>
+              A segurança da informação no Trampay compreende práticas, processos e tecnologias destinados à proteção de dados e sistemas computacionais contra acessos não autorizados, uso indevido ou destruição acidental.
+            </Text>
+            <Text style={styles.policyText}>
+              Nossa plataforma fundamenta-se nos princípios de confidencialidade, integridade e disponibilidade, em conformidade com a norma ISO/IEC 27001.
+            </Text>
+
+            <Text style={styles.policySection}>2. PROTEÇÃO DE DADOS PESSOAIS (LGPD)</Text>
+            <Text style={styles.policyText}>
+              O Trampay está em total conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD - Lei nº 13.709/2018).
+            </Text>
+            <Text style={styles.policyText}>
+              • Criptografia: Senhas são armazenadas com algoritmo bcrypt. Transmissões via HTTPS/TLS 1.3.{'\n'}
+              • Controle de Acesso: Modelo baseado em papéis (RBAC) com autenticação JWT.{'\n'}
+              • Auditoria: Registro detalhado de todas as operações em logs imutáveis.{'\n'}
+              • Backups: Automáticos e diários em servidores redundantes.
+            </Text>
+
+            <Text style={styles.policySection}>3. SEUS DIREITOS</Text>
+            <Text style={styles.policyText}>
+              Você tem direito a:{'\n'}
+              • Acessar, corrigir ou excluir seus dados pessoais{'\n'}
+              • Revogar consentimento a qualquer momento{'\n'}
+              • Solicitar portabilidade dos seus dados{'\n'}
+              • Ser informado sobre o uso e compartilhamento de dados
+            </Text>
+
+            <Text style={styles.policySection}>4. COLETA E USO DE DADOS</Text>
+            <Text style={styles.policyText}>
+              Coletamos apenas dados essenciais para funcionamento do sistema: nome, e-mail, telefone, CPF/CNPJ, endereço e informações financeiras relacionadas às suas transações.
+            </Text>
+            <Text style={styles.policyText}>
+              Seus dados NÃO serão compartilhados com terceiros sem seu consentimento expresso, exceto quando exigido por lei.
+            </Text>
+
+            <Text style={styles.policySection}>5. SEGURANÇA TÉCNICA</Text>
+            <Text style={styles.policyText}>
+              • Banco de dados MySQL hospedado em AlwaysData com isolamento de instâncias{'\n'}
+              • Backend .NET 8 com autenticação JWT Bearer{'\n'}
+              • Prepared statements para prevenção de SQL Injection{'\n'}
+              • Limitação de tentativas de login contra força bruta{'\n'}
+              • Monitoramento contínuo e detecção de anomalias
+            </Text>
+
+            <Text style={styles.policySection}>6. COMPROMISSO ÉTICO</Text>
+            <Text style={styles.policyText}>
+              O Trampay garante transparência, respeito à privacidade e proteção integral dos direitos dos usuários, alinhado às melhores práticas de segurança digital.
+            </Text>
+          </ScrollView>
+          <View style={styles.policyFooter}>
+            <TouchableOpacity 
+              style={styles.policyAcceptBtn}
+              onPress={() => {
+                setAcceptedPolicies(true);
+                setShowPoliciesModal(false);
+              }}
+            >
+              <Text style={styles.policyAcceptText}>Aceitar e Continuar</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -323,4 +420,102 @@ const styles = StyleSheet.create({
   modalText: { fontSize: 16, color: colors.text },
   modalClose: { marginTop: 16, alignSelf: 'center' },
   modalCloseText: { color: colors.primaryDark, fontFamily: fonts.bold, fontSize: 16 },
+  
+  // Checkbox de Políticas
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 6,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  checkboxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: {
+    color: colors.primaryDark,
+    fontSize: 16,
+    fontFamily: fonts.bold,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  policyLink: {
+    color: colors.primary,
+    fontFamily: fonts.semibold,
+    textDecorationLine: 'underline',
+  },
+  
+  // Modal de Políticas
+  policyModal: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  policyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  policyTitle: {
+    fontSize: 18,
+    fontFamily: fonts.bold,
+    color: colors.primaryDark,
+    flex: 1,
+  },
+  policyClose: {
+    fontSize: 28,
+    color: colors.textLight,
+    marginLeft: 10,
+  },
+  policyContent: {
+    flex: 1,
+    padding: 20,
+  },
+  policySection: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: colors.primaryDark,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  policyText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  policyFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  policyAcceptBtn: {
+    backgroundColor: colors.primary,
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  policyAcceptText: {
+    color: colors.primaryDark,
+    fontFamily: fonts.bold,
+    fontSize: 16,
+  },
 });

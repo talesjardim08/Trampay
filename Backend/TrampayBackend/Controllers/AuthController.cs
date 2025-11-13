@@ -26,7 +26,7 @@ namespace TrampayBackend.Controllers
             _cfg = cfg;
         }
 
-        // ---------- LOGIN ----------
+        // ---------- LOGIN (OPTIMIZED - retorna perfil completo + isPro) ----------
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] JsonElement body)
         {
@@ -38,8 +38,17 @@ namespace TrampayBackend.Controllers
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(senha))
                     return BadRequest(new { error = "Email e senha são obrigatórios" });
 
-                var sql = "SELECT id, email, password_hash, is_active FROM users WHERE email = @Email LIMIT 1";
-                var user = await _db.QueryFirstOrDefaultAsync<UserRow>(sql, new { Email = email });
+                // Query otimizada: busca user + perfil + subscription em 1 só query
+                var sql = @"
+                    SELECT u.id, u.email, u.password_hash, u.is_active, u.account_type, u.document_type, u.document_number,
+                           u.legal_name, u.display_name, u.phone, u.address_city, u.address_state,
+                           CASE WHEN s.id IS NOT NULL AND s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > NOW()) THEN 1 ELSE 0 END as is_pro
+                    FROM users u
+                    LEFT JOIN subscriptions s ON u.id = s.user_id
+                    WHERE u.email = @Email 
+                    LIMIT 1";
+                
+                var user = await _db.QueryFirstOrDefaultAsync<dynamic>(sql, new { Email = email });
 
                 if (user == null || user.is_active != 1)
                     return BadRequest(new { error = "Credenciais inválidas" });
@@ -49,13 +58,23 @@ namespace TrampayBackend.Controllers
 
                 var token = GenerateJwt(user.id);
 
+                // Retorna token + perfil completo + isPro (batch otimizado!)
                 return Ok(new
                 {
                     token,
                     user = new
                     {
-                        id = user.id,
-                        email = user.email
+                        id = (long)user.id,
+                        email = (string)user.email,
+                        accountType = (string)user.account_type,
+                        documentType = (string)user.document_type,
+                        documentNumber = (string)user.document_number,
+                        legalName = (string)user.legal_name,
+                        displayName = (string)user.display_name,
+                        phone = (string)user.phone,
+                        addressCity = (string)user.address_city,
+                        addressState = (string)user.address_state,
+                        isPro = user.is_pro == 1
                     }
                 });
             }
