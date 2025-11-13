@@ -174,57 +174,73 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (13/11/2025)
 
-### Migração AsyncStorage + Sistema PRO Completo
+### 🚀 5 Tarefas Implementadas + Otimizações Críticas
 
-**Migração de Storage (Cross-Platform):**
-- ✅ Migração completa de SecureStore → AsyncStorage em TODOS os arquivos
-- ✅ Compatibilidade web + mobile garantida
-- ✅ Arquivos migrados: `AuthContext.js`, `authService.js`, `api.js`, `CryptoScreen.js`, `CurrencyScreen.js`, `PricingScreen.js`, `TradingHomeScreen.js`, `StocksScreen.js`
-- ✅ Todos imports duplicados removidos
-- ✅ Frontend compilando sem erros (767 módulos)
+**1. BACKEND - Novos Endpoints Criados:**
+- ✅ **InventoryController** - CRUD completo + `/low-stock` endpoint (items abaixo do mínimo)
+- ✅ **EquipmentController** - CRUD completo para equipamentos
+- ✅ **EventsController** - CRUD completo + `/upcoming` endpoint (próximos eventos)
+- ✅ **AnalyticsController** - 7 endpoints para gráficos no backend:
+  1. `/summary` - Resumo financeiro (receitas, despesas, saldo, transações)
+  2. `/cashflow` - Fluxo de caixa mensal
+  3. `/expenses-by-category` - Despesas agrupadas por categoria
+  4. `/revenue-by-category` - Receitas agrupadas por categoria
+  5. `/top-clients` - Top clientes por volume de transações
+  6. `/profitable-items` - Items mais lucrativos
+  7. `/growth-trends` - Tendências de crescimento
+- ✅ Todos endpoints com `[Authorize]`, validação de userId e scoping por `owner_user_id`
+- ✅ Prepared statements (Dapper) para segurança SQL Injection
 
-**Sistema de Proteção PRO:**
-- ✅ HOC `withPremiumProtection` aplicado em 5 telas premium:
-  1. **CryptoScreen** - Índices de criptomoedas
-  2. **CurrencyScreen** - Câmbio e moedas
-  3. **PricingScreen** - Tabela de preços
-  4. **TradingHomeScreen** - Trading e investimentos
-  5. **StocksScreen** - Ações e mercado
-- ✅ Verificação automática de assinatura PRO
-- ✅ Redirecionamento para `AssineProScreen` se não-PRO
-- ✅ Todas telas protegidas funcionando sem erros
+**2. LOGIN OTIMIZADO (Performance):**
+- ✅ Modificado `AuthController.cs` Login endpoint
+- ✅ Agora retorna perfil completo + isPro em **1 única query** (batch operation)
+- ✅ LEFT JOIN com `subscriptions` para calcular `isPro`
+- ✅ Elimina requisição extra ao `/api/auth/profile` após login
+- ✅ Reduz tempo de carregamento inicial do app
 
-**SQL Migration (Banco de Dados):**
-- ✅ Criado `Backend/add_missing_tables.sql` com 5 tabelas faltantes:
-  1. `schedules` - Agendamentos
-  2. `ai_chats` - Conversas com IA
-  3. `ai_messages` - Mensagens do chat IA
-  4. `password_resets` - Recuperação de senha
-  5. `events` - Eventos do calendário
-- ✅ Todas tabelas com `CREATE TABLE IF NOT EXISTS`
-- ✅ Foreign keys corretos com `ON DELETE CASCADE`
-- ✅ Indexes otimizados para performance
-- ✅ Compatível com controllers backend existentes
-- ✅ Instruções de execução em `INSTRUCOES_BANCO_DADOS.md`
-- **PENDENTE:** Usuário executar SQL no phpMyAdmin AlwaysData
+**3. SPLASH SCREEN - Logo Profissional:**
+- ✅ Substituído emoji 👤 placeholder pela logo real `logo_trampay_2025_2.png`
+- ✅ Importado `Image` component do React Native
+- ✅ Estilização: 200x200px com `resizeMode="contain"`
+- ✅ Animação mantida (fade + scale)
+
+**4. POLÍTICAS LGPD + CHECKBOX OBRIGATÓRIO:**
+- ✅ Adicionado checkbox na tela de cadastro (`CreateAccountScreen.js`)
+- ✅ Modal completo com **6 seções** das Políticas de Segurança e Privacidade:
+  1. Segurança da Informação (ISO/IEC 27001)
+  2. Proteção de Dados Pessoais (LGPD - Lei 13.709/2018)
+  3. Direitos do Usuário (acesso, correção, exclusão, portabilidade)
+  4. Coleta e Uso de Dados (transparência)
+  5. Segurança Técnica (bcrypt, JWT, HTTPS/TLS 1.3, SQL prepared statements)
+  6. Compromisso Ético
+- ✅ Validação: **só permite cadastro** se checkbox marcado
+- ✅ Link clicável para abrir modal de políticas
+- ✅ BUG CORRIGIDO: Separado checkbox do link (TouchableOpacity independentes) para evitar crash de `e.stopPropagation()` no React Native
+
+**5. REVISÃO ARQUITETO:**
+- ✅ Todas 5 tarefas aprovadas pelo architect agent
+- ✅ Segurança validada (autenticação, scoping, SQL injection)
+- ✅ Performance validada (login batch, analytics backend-driven)
+- ✅ UX validada (políticas obrigatórias, logo profissional)
+
+**Arquivos Novos:**
+- `Backend/TrampayBackend/Controllers/InventoryController.cs`
+- `Backend/TrampayBackend/Controllers/EquipmentController.cs`
+- `Backend/TrampayBackend/Controllers/EventsController.cs`
+- `Backend/TrampayBackend/Controllers/AnalyticsController.cs`
 
 **Arquivos Modificados:**
-- `Trampay/AuthContext.js`
-- `Trampay/authService.js`
-- `Trampay/services/api.js`
-- `Trampay/screens/CryptoScreen.js`
-- `Trampay/screens/CurrencyScreen.js`
-- `Trampay/screens/PricingScreen.js`
-- `Trampay/screens/TradingHomeScreen.js`
-- `Trampay/screens/StocksScreen.js`
+- `Backend/TrampayBackend/Controllers/AuthController.cs` (login otimizado)
+- `Trampay/SplashScreen.js` (logo real)
+- `Trampay/CreateAccountScreen.js` (políticas + checkbox + correção bug)
 
-**Novos Arquivos:**
-- `Backend/add_missing_tables.sql` - SQL migration production-ready
-- `INSTRUCOES_BANCO_DADOS.md` - Guia passo-a-passo para usuário
+**Status:**
+- **Backend:** ✅ Rodando sem erros (porta 8080)
+- **Frontend:** ✅ Compilado sem erros
+- **Próximo:** Usuário testar fluxo completo de cadastro com políticas
 
-**Próximos Passos:**
-1. **Usuário:** Executar `Backend/add_missing_tables.sql` no AlwaysData (instruções no `INSTRUCOES_BANCO_DADOS.md`)
-2. **Backend:** Criar endpoints faltantes (`/api/inventory`, `/api/equipment`, `/api/events`)
-3. **Performance:** Otimizar login (batch JWT + profile em 1 request)
-4. **Analytics:** Criar endpoints para mover cálculos de gráficos para backend
-5. **Testes:** Validar fluxo completo Login → Home → PRO → IA
+**Pendente Usuário:**
+1. Executar `Backend/add_missing_tables.sql` no phpMyAdmin AlwaysData
+2. Testar fluxo de cadastro (verificar modal de políticas + checkbox)
+3. Testar login otimizado (performance)
+4. Validar novos endpoints `/api/inventory`, `/api/equipment`, `/api/events`, `/api/analytics`
