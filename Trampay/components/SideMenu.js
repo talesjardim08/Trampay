@@ -130,6 +130,13 @@ const SideMenu = ({ navigation, onClose }) => {
           <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => handleNavigation('Settings')}
+        >
+          <Text style={styles.menuItemText}>Configurações</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
           <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
         </TouchableOpacity>

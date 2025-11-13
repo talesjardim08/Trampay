@@ -7,73 +7,59 @@ import {
   ScrollView,
   SafeAreaView,
   StyleSheet,
-  Alert
+  Alert,
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
 
 const NotificationsScreen = ({ navigation }) => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'Serviço - Cliente - Hoje',
-      description: 'Novo agendamento confirmado',
-      time: '2 min atrás',
-      type: 'hoje',
-      read: false
-    },
-    {
-      id: 2,
-      title: 'Serviço - Cliente - Hoje',
-      description: 'Pagamento recebido',
-      time: '5 min atrás',
-      type: 'hoje',
-      read: false
-    },
-    {
-      id: 3,
-      title: 'Serviço - Cliente - Amanhã',
-      description: 'Lembrete de agendamento',
-      time: '1 hora atrás',
-      type: 'proximos',
-      read: true
-    },
-    {
-      id: 4,
-      title: 'Serviço - Cliente - 00\\00\\0000',
-      description: 'Agendamento cancelado',
-      time: '2 horas atrás',
-      type: 'futuros',
-      read: true
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Carrega notificações salvas ao iniciar
   useEffect(() => {
     loadNotifications();
   }, []);
 
   const loadNotifications = async () => {
+    setLoading(true);
     try {
-      const savedNotifications = await AsyncStorage.getItem('userNotifications');
-      if (savedNotifications) {
-        setNotifications(JSON.parse(savedNotifications));
-      }
+      const response = await api.get('/notifications');
+      const items = response.data?.items || [];
+      setNotifications(items);
     } catch (error) {
       console.error('Erro ao carregar notificações:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const saveNotifications = async (updatedNotifications) => {
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      await AsyncStorage.setItem('userNotifications', JSON.stringify(updatedNotifications));
+      const response = await api.get('/notifications');
+      const items = response.data?.items || [];
+      setNotifications(items);
     } catch (error) {
-      console.error('Erro ao salvar notificações:', error);
+      console.error('Erro ao atualizar notificações:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  const removeNotification = (notificationId) => {
+  const markAsRead = async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error('Erro ao marcar como lida:', error);
+    }
+  };
+
+  const removeNotification = async (id) => {
     Alert.alert(
       'Remover Notificação',
       'Tem certeza que deseja remover esta notificação?',
@@ -85,39 +71,85 @@ const NotificationsScreen = ({ navigation }) => {
         {
           text: 'Remover',
           style: 'destructive',
-          onPress: () => {
-            const updatedNotifications = notifications.filter(n => n.id !== notificationId);
-            setNotifications(updatedNotifications);
-            saveNotifications(updatedNotifications);
-            Alert.alert('Sucesso', 'Notificação removida!');
+          onPress: async () => {
+            try {
+              await api.delete(`/notifications/${id}`);
+              setNotifications(prev => prev.filter(n => n.id !== id));
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível deletar.');
+            }
           }
         }
       ]
     );
   };
 
-  const groupedNotifications = {
-    hoje: notifications.filter(n => n.type === 'hoje'),
-    proximos: notifications.filter(n => n.type === 'proximos'),
-    futuros: notifications.filter(n => n.type === 'futuros')
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return '';
+    const now = new Date();
+    const created = new Date(dateString);
+    const diffMs = now - created;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Agora';
+    if (diffMins < 60) return `${diffMins} min atrás`;
+    if (diffHours < 24) return `${diffHours} hora${diffHours > 1 ? 's' : ''} atrás`;
+    return `${diffDays} dia${diffDays > 1 ? 's' : ''} atrás`;
   };
 
+  const groupNotificationsByDate = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const grouped = {
+      hoje: [],
+      proximos: [],
+      futuros: []
+    };
+
+    notifications.forEach(notification => {
+      const createdDate = new Date(notification.created_at);
+      const dateOnly = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
+
+      if (dateOnly.getTime() === today.getTime()) {
+        grouped.hoje.push(notification);
+      } else if (dateOnly < nextWeek) {
+        grouped.proximos.push(notification);
+      } else {
+        grouped.futuros.push(notification);
+      }
+    });
+
+    return grouped;
+  };
+
+  const groupedNotifications = groupNotificationsByDate();
+
   const renderNotification = (notification) => (
-    <View
+    <TouchableOpacity
       key={notification.id}
       style={[
         styles.notificationItem,
-        !notification.read && styles.unreadNotification
+        !notification.is_read && styles.unreadNotification
       ]}
+      onPress={() => markAsRead(notification.id)}
     >
       <View style={styles.notificationContent}>
         <Text style={styles.notificationTitle}>{notification.title}</Text>
-        <Text style={styles.notificationDescription}>{notification.description}</Text>
-        <Text style={styles.notificationTime}>{notification.time}</Text>
+        {notification.body && (
+          <Text style={styles.notificationDescription}>{notification.body}</Text>
+        )}
+        <Text style={styles.notificationTime}>{getTimeAgo(notification.created_at)}</Text>
       </View>
       
       <View style={styles.notificationActions}>
-        {!notification.read && <View style={styles.unreadDot} />}
+        {!notification.is_read && <View style={styles.unreadDot} />}
         <TouchableOpacity 
           style={styles.removeButton}
           onPress={() => removeNotification(notification.id)}
@@ -125,12 +157,11 @@ const NotificationsScreen = ({ navigation }) => {
           <Ionicons name="trash-outline" size={18} color={colors.error} />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -146,38 +177,53 @@ const NotificationsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Hoje */}
-        {groupedNotifications.hoje.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Hoje</Text>
-            {groupedNotifications.hoje.map(renderNotification)}
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        )}
+        ) : (
+          <>
+            {groupedNotifications.hoje.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Hoje</Text>
+                {groupedNotifications.hoje.map(renderNotification)}
+              </View>
+            )}
 
-        {/* Mais Próximos */}
-        {groupedNotifications.proximos.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Mais Próximos</Text>
-            {groupedNotifications.proximos.map(renderNotification)}
-          </View>
-        )}
+            {groupedNotifications.proximos.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Mais Próximos</Text>
+                {groupedNotifications.proximos.map(renderNotification)}
+              </View>
+            )}
 
-        {/* Futuros */}
-        {groupedNotifications.futuros.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Futuros</Text>
-            {groupedNotifications.futuros.map(renderNotification)}
-          </View>
-        )}
+            {groupedNotifications.futuros.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Futuros</Text>
+                {groupedNotifications.futuros.map(renderNotification)}
+              </View>
+            )}
 
-        {/* Empty State */}
-        {notifications.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              Nenhuma notificação no momento
-            </Text>
-          </View>
+            {notifications.length === 0 && !loading && (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="notifications-none" size={64} color={colors.textLight} />
+                <Text style={styles.emptyStateText}>
+                  Nenhuma notificação no momento
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -221,9 +267,15 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
 
-
   content: {
     flex: 1,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: spacing.xl * 3,
   },
 
   section: {
@@ -307,6 +359,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: colors.textLight,
     textAlign: 'center',
+    marginTop: spacing.md,
   },
 });
 

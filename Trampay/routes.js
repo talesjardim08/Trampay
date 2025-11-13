@@ -28,6 +28,8 @@ import CryptoScreen from './screens/CryptoScreen';
 import StocksScreen from './screens/StocksScreen';
 
 import TaxSimulatorScreen from './screens/TaxSimulatorScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import ProUpgradeScreen from './screens/ProUpgradeScreen';
 
 const Stack = createStackNavigator();
 
@@ -214,6 +216,16 @@ const AppRoutes = () => {
         <Stack.Screen 
           name="AssinePro" 
           component={require('./screens/AssineProScreen').default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Settings" 
+          component={SettingsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="ProUpgrade" 
+          component={ProUpgradeScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

@@ -12,7 +12,7 @@ import {
   Image,
   ActivityIndicator
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, spacing } from '../styles';
 import { AuthContext } from '../AuthContext';
@@ -255,6 +255,36 @@ const EditProfileScreen = ({ navigation }) => {
               <Text style={styles.saveButtonText}>Salvar Alterações</Text>
             )}
           </TouchableOpacity>
+
+          {/* Delete Account Button */}
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => {
+              Alert.alert(
+                'Deletar Conta',
+                'Tem certeza que deseja excluir sua conta? Esta ação é irreversível e todos os seus dados serão perdidos.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Deletar',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await api.delete('/auth/profile');
+                        Alert.alert('Conta deletada', 'Sua conta foi excluída com sucesso.');
+                        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+                      } catch (error) {
+                        Alert.alert('Erro', 'Não foi possível deletar sua conta. Tente novamente.');
+                      }
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <MaterialIcons name="delete-forever" size={20} color={colors.white} />
+            <Text style={styles.deleteButtonText}>Deletar Minha Conta</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -419,6 +449,23 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 18,
     fontFamily: fonts.bold,
+  },
+
+  deleteButton: {
+    flexDirection: 'row',
+    backgroundColor: '#FF5722',
+    height: 56,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+
+  deleteButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    marginLeft: spacing.sm,
   },
 });
 

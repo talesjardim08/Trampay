@@ -37,6 +37,26 @@ namespace TrampayBackend.Controllers
             return Ok(new { id, read = true });
         }
 
+        [HttpPatch("{id:long}/read")]
+        [Authorize]
+        public async Task<IActionResult> PatchRead(long id)
+        {
+            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+            var rows = await _db.ExecuteAsync("UPDATE notifications SET is_read = 1 WHERE id = @Id AND user_id = @User", new { Id = id, User = userId });
+            if (rows == 0) return NotFound();
+            return Ok(new { id, isRead = true });
+        }
+
+        [HttpDelete("{id:long}")]
+        [Authorize]
+        public async Task<IActionResult> Delete(long id)
+        {
+            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+            var rows = await _db.ExecuteAsync("DELETE FROM notifications WHERE id = @Id AND user_id = @User", new { Id = id, User = userId });
+            if (rows == 0) return NotFound();
+            return NoContent();
+        }
+
         // endpoint para criar notificações (usado internamente por outras rotas)
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] CreateNotificationDto dto)
