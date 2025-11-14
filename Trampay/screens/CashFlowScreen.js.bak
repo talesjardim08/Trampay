@@ -477,25 +477,25 @@ const CashFlowScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* Bar Chart - Lucros vs Despesas */}
-          <View style={styles.barChartContainer}>
-            <Text style={styles.barChartTitle}>Proporção Lucros x Despesas</Text>
-            <BarChart
-              data={[
-                { 
-                  label: 'Lucros', 
-                  value: forecast[forecastTab].income, 
-                  color: colors.success 
-                },
-                { 
-                  label: 'Despesas', 
-                  value: forecast[forecastTab].expenses, 
-                  color: colors.danger 
-                }
-              ]}
-              width={width - 60}
-              height={200}
-              showLegend={true}
+          {/* Line Chart */}
+          <View style={styles.lineChartContainer}>
+            <View style={styles.chartLegendContainer}>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: colors.success }]} />
+                <Text style={styles.chartLegendText}>Entradas</Text>
+              </View>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: colors.danger }]} />
+                <Text style={styles.chartLegendText}>Saídas</Text>
+              </View>
+            </View>
+            <LineChart
+              data={{
+                income: forecast[forecastTab].income,
+                expenses: forecast[forecastTab].expenses
+              }}
+              width={width - 40}
+              height={150}
             />
           </View>
         </View>
@@ -906,18 +906,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     color: colors.success,
   },
-  barChartContainer: {
+  lineChartContainer: {
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: spacing.md,
     alignItems: 'center',
-  },
-  barChartTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bold,
-    color: colors.textDark,
-    marginBottom: spacing.md,
-    textAlign: 'center',
   },
   
   // Estilos para o gráfico de pizza atualizado
