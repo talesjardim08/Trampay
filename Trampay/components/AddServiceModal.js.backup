@@ -65,23 +65,41 @@ const AddServiceModal = ({ visible, onClose, onAdd, clients, serviceTemplates })
   const validateForm = () => {
     const newErrors = {};
 
-    // Validar data apenas se foi preenchida
-    if (formData.date.trim()) {
+    if (!formData.date.trim()) {
+
+    } else {
       const isoDate = convertDateToISO(formData.date);
       if (!isoDate) {
         newErrors.date = 'Data inválida';
+      } else {
+        // Verificar se a data não é no passado
+        const today = new Date();
+        const serviceDate = new Date(isoDate);
+        today.setHours(0, 0, 0, 0);
+        serviceDate.setHours(0, 0, 0, 0);
+        
+        if (serviceDate < today) {
+          newErrors.date = 'Data não pode ser no passado';
+        }
       }
     }
 
-    // Validar horário apenas se foi preenchido
-    if (formData.time.trim()) {
+    if (!formData.time.trim()) {
+      newErrors.time = 'Horário é obrigatório';
+    } else {
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timeRegex.test(formData.time)) {
         newErrors.time = 'Horário inválido';
       }
     }
 
-    // Cliente e serviço não são mais obrigatórios
+    if (!formData.clientName.trim()) {
+      newErrors.clientName = 'Cliente é obrigatório';
+    }
+
+    if (!formData.serviceName.trim()) {
+      newErrors.serviceName = 'Serviço é obrigatório';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

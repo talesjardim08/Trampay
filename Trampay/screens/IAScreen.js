@@ -234,6 +234,9 @@ export default function IAScreen({ navigation }) {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={styles.title}>IA Assistant</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setShowChats(true)} style={styles.headerButton}><Text style={styles.headerButtonText}>Conversas</Text></TouchableOpacity>
@@ -334,6 +337,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   containerBlocked: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md, backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
+  backButton: { padding: spacing.xs },
   title: { fontSize: 20, fontFamily: fonts.bold, color: colors.text },
   headerActions: { flexDirection: "row", gap: spacing.sm },
   headerButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md, marginLeft: spacing.sm },

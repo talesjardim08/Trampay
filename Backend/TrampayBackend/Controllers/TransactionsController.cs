@@ -84,6 +84,22 @@ namespace TrampayBackend.Controllers
                 Status = dto.Status ?? "concluído"
             });
 
+            // Atualizar saldo em mãos automaticamente
+            var adjustmentAmount = dto.Type == "income" ? dto.Amount : -dto.Amount;
+            var balanceSql = @"
+                INSERT INTO user_balance (user_id, balance, currency, updated_at) 
+                VALUES (@UserId, @Amount, @Currency, NOW())
+                ON DUPLICATE KEY UPDATE 
+                    balance = balance + @Amount, 
+                    updated_at = NOW()";
+
+            await _db.ExecuteAsync(balanceSql, new
+            {
+                UserId = userId,
+                Amount = adjustmentAmount,
+                Currency = dto.Currency ?? "BRL"
+            });
+
             var row = await _db.QueryFirstOrDefaultAsync("SELECT * FROM transactions WHERE id = @Id", new { Id = id });
             return Created($"/api/transactions/{id}", row);
         }
