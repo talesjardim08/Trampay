@@ -15,6 +15,7 @@ import {
   Clipboard,
   TouchableWithoutFeedback
 } from "react-native";
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from "../styles";
 import api from "../services/api";
 import { AuthContext } from "../AuthContext";
