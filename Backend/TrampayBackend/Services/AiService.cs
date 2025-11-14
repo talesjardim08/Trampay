@@ -72,10 +72,10 @@ namespace TrampayBackend.Services
         public async Task<string> GetChatResponseAsync(string input)
         {
             var geminiKey = _config["Ai:GeminiApiKey"] 
-                ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI")
+                ?? Environment.GetEnvironmentVariable("api__key__gemini")
                 ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
             
-            Console.WriteLine($"[AiService.GetChatResponseAsync] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_API__KEY={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("API__KEY__GEMINI"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
+            Console.WriteLine($"[AiService.GetChatResponseAsync] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_api__key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("api__key__gemini"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
             
             if (string.IsNullOrEmpty(geminiKey))
             {
@@ -185,10 +185,10 @@ namespace TrampayBackend.Services
         public async Task<string> GetChatResponseAsync(IList<ChatMessage> messages)
         {
             var geminiKey = _config["Ai:GeminiApiKey"] 
-                ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI")
+                ?? Environment.GetEnvironmentVariable("api__key__gemini")
                 ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
             
-            Console.WriteLine($"[AiService.GetChatResponseAsync-History] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_API__KEY={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("API__KEY__GEMINI"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
+            Console.WriteLine($"[AiService.GetChatResponseAsync-History] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_api__key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("api__key__gemini"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
             
             if (string.IsNullOrEmpty(geminiKey))
             {
