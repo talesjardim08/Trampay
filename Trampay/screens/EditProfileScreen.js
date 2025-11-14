@@ -1,17 +1,5 @@
-// Tela Editar Perfil do Trampay
 import React, { useState, useEffect, useContext } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  StyleSheet,
-  Alert,
-  Image,
-  ActivityIndicator
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, SafeAreaView, StyleSheet, Alert, Image, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, spacing } from '../styles';
@@ -31,7 +19,6 @@ const EditProfileScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Carrega dados do perfil do usuário logado
   useEffect(() => {
     loadProfileData();
   }, [user]);
@@ -52,32 +39,19 @@ const EditProfileScreen = ({ navigation }) => {
       Alert.alert('Erro', 'Nome e email são obrigatórios.');
       return;
     }
-    
     setIsLoading(true);
     try {
-      const payload = {
-        email: formData.email,
-        displayName: formData.displayName,
-        phone: formData.phone,
-      };
-
-      // Só envia senha se foi preenchida
+      const profilePayload = { email: formData.email, displayName: formData.displayName, phone: formData.phone };
+      const response = await api.put('/auth/profile', profilePayload);
       if (formData.password && formData.password.trim()) {
-        payload.password = formData.password;
+        await api.put('/auth/profile/password', { currentPassword: '', newPassword: formData.password });
       }
-
-      const response = await api.put('/auth/profile', payload);
-      
-      if (response.data) {
-        // Atualiza contexto
-        if (setUser) {
-          setUser(response.data);
-        }
-        Alert.alert('Sucesso!', 'Seus dados foram atualizados.');
-        navigation.goBack();
+      if (response.data && setUser) {
+        setUser(response.data);
       }
+      Alert.alert('Sucesso!', 'Seus dados foram atualizados.');
+      navigation.goBack();
     } catch (err) {
-      console.error("Erro ao atualizar perfil:", err);
       Alert.alert('Erro', err.response?.data?.error || 'Não foi possível atualizar seu perfil.');
     } finally {
       setIsLoading(false);
@@ -152,7 +126,6 @@ const EditProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -185,7 +158,6 @@ const EditProfileScreen = ({ navigation }) => {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Form Fields */}
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>NOME</Text>
@@ -243,7 +215,6 @@ const EditProfileScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* Save Button */}
           <TouchableOpacity
             style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -256,7 +227,6 @@ const EditProfileScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          {/* Delete Account Button */}
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => {

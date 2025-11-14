@@ -66,7 +66,7 @@ namespace TrampayBackend.Controllers
                     return BadRequest(new { error = "Email e senha são obrigatórios." });
 
                 // Verifica se o email já existe
-                var existing = _db.QueryFirstOrDefault<int?>("SELECT id_user FROM users WHERE email = @Email LIMIT 1", new { Email = body.Email.Trim().ToLower() });
+                var existing = _db.QueryFirstOrDefault<long?>("SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = body.Email.Trim().ToLower() });
                 if (existing.HasValue)
                     return BadRequest(new { error = "Email já cadastrado." });
 
@@ -75,16 +75,16 @@ namespace TrampayBackend.Controllers
 
                 // Insere usuário (adapte colunas conforme seu schema; use id_user se for o seu padrão)
                 var sql = @"
-                    INSERT INTO users (name, email, password, phone, created_at)
-                    VALUES (@Name, @Email, @Password, @Phone, NOW());
+                    INSERT INTO users (display_name, email, password_hash, phone, created_at)
+                    VALUES (@DisplayName, @Email, @PasswordHash, @Phone, NOW());
                     SELECT LAST_INSERT_ID();
                 ";
 
                 var newId = _db.ExecuteScalar<long>(sql, new
                 {
-                    Name = body.Name?.Trim(),
+                    DisplayName = body.Name?.Trim(),
                     Email = body.Email.Trim().ToLower(),
-                    Password = hashed,
+                    PasswordHash = hashed,
                     Phone = body.Phone
                 });
 
@@ -113,27 +113,20 @@ namespace TrampayBackend.Controllers
                     return BadRequest(new { error = "Email e senha são obrigatórios." });
 
                 // Recupera usuário por email
-                var sql = "SELECT id_user AS Id, email, password FROM users WHERE email = @Email LIMIT 1";
+                var sql = "SELECT id AS Id, email, password_hash AS PasswordHash FROM users WHERE email = @Email LIMIT 1";
                 var user = _db.QueryFirstOrDefault<LoginUserDto>(sql, new { Email = body.Email.Trim().ToLower() });
 
                 if (user == null)
                     return Unauthorized(new { error = "Credenciais inválidas." });
 
                 // Verifica senha
-                var ok = BCrypt.Net.BCrypt.Verify(body.Password, user.Password);
+                var ok = BCrypt.Net.BCrypt.Verify(body.Password, user.PasswordHash);
                 if (!ok)
                     return Unauthorized(new { error = "Credenciais inválidas." });
 
                 // Gera JWT
                 var token = GenerateJwtToken(user.Id.ToString(), user.Email);
-                // Gera refresh token e salva no BD
                 var refreshToken = GenerateRefreshToken();
-                var insertRefreshSql = @"
-                    INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
-                    VALUES (@UserId, @Token, DATE_ADD(NOW(), INTERVAL @Days DAY), NOW());
-                ";
-                int refreshDays = int.TryParse(_config["Jwt:RefreshExpiryDays"], out var d) ? d : 30;
-                _db.Execute(insertRefreshSql, new { UserId = user.Id, Token = refreshToken, Days = refreshDays });
 
                 return Ok(new
                 {
@@ -172,7 +165,7 @@ namespace TrampayBackend.Controllers
 
                 // Gera novo token e novo refresh token (rotating)
                 var userId = rt.user_id.ToString();
-                var email = _db.ExecuteScalar<string>("SELECT email FROM users WHERE id_user = @Id LIMIT 1", new { Id = userId });
+                var email = _db.ExecuteScalar<string>("SELECT email FROM users WHERE id = @Id LIMIT 1", new { Id = userId });
 
                 var newToken = GenerateJwtToken(userId, email);
                 var newRefresh = GenerateRefreshToken();
@@ -262,10 +255,10 @@ namespace TrampayBackend.Controllers
         // -----------------------------
         private string GenerateJwtToken(string userId, string email)
         {
-            var key = _config["Jwt:Key"];
+            var key = _config["Jwt:Secret"];
             var issuer = _config["Jwt:Issuer"];
             var audience = _config["Jwt:Audience"];
-            int minutes = int.TryParse(_config["Jwt:ExpiryMinutes"], out var m) ? m : 60;
+            int minutes = int.TryParse(_config["Jwt:ExpireMinutes"], out var m) ? m : 60;
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -317,7 +310,7 @@ namespace TrampayBackend.Controllers
     {
         public long Id { get; set; }
         public string Email { get; set; }
-        public string Password { get; set; }
+        public string PasswordHash { get; set; }
     }
 
     public class RefreshDto
@@ -327,6 +320,6 @@ namespace TrampayBackend.Controllers
 
     public class LogoutDto
     {
-        public string RefreshToken { get; set; } // opcional
+        public string RefreshToken { get; set; }
     }
 }

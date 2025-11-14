@@ -18,9 +18,6 @@ namespace TrampayBackend.Controllers
             _db = db;
         }
 
-        /// <summary>
-        /// Retorna o perfil completo do usuário logado
-        /// </summary>
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> GetProfile()
@@ -54,9 +51,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        /// <summary>
-        /// Atualiza nome, email ou telefone
-        /// </summary>
         [HttpPut]
         [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] dynamic body)
@@ -95,9 +89,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        /// <summary>
-        /// Atualiza a senha do usuário
-        /// </summary>
         [HttpPut("password")]
         [Authorize]
         public async Task<IActionResult> UpdatePassword([FromBody] dynamic body)
@@ -114,22 +105,18 @@ namespace TrampayBackend.Controllers
                 if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
                     return BadRequest(new { error = "Senha atual e nova senha são obrigatórias." });
 
-                // Obtém hash atual
                 var sqlGet = "SELECT password FROM users WHERE id_user = @id LIMIT 1";
                 var storedHash = await _db.ExecuteScalarAsync<string>(sqlGet, new { id = userId });
 
                 if (storedHash == null)
                     return Unauthorized(new { error = "Usuário não encontrado." });
 
-                // Verifica senha
                 bool valid = BCrypt.Net.BCrypt.Verify(currentPassword, storedHash);
                 if (!valid)
                     return BadRequest(new { error = "Senha atual incorreta." });
 
-                // Gera novo hash
                 string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
 
-                // Atualiza no BD
                 var sqlUpdate = "UPDATE users SET password = @hash WHERE id_user = @id";
                 await _db.ExecuteAsync(sqlUpdate, new { id = userId, hash = newHash });
 
@@ -138,6 +125,28 @@ namespace TrampayBackend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = "Erro interno ao atualizar a senha.", detail = ex.Message });
+            }
+        }
+
+        [HttpDelete]
+        [Authorize]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            try
+            {
+                var userId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { error = "Token inválido ou expirado." });
+
+                var affected = await _db.ExecuteAsync("DELETE FROM users WHERE id = @id", new { id = userId });
+                if (affected == 0)
+                    return NotFound(new { error = "Usuário não encontrado." });
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Erro interno ao deletar a conta.", detail = ex.Message });
             }
         }
     }

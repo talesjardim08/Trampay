@@ -1,15 +1,5 @@
-// Side Menu do Trampay — integrado com AuthContext
 import React, { useContext } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  StyleSheet,
-  StatusBar,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
 import { AuthContext } from '../AuthContext';
@@ -17,7 +7,6 @@ import { AuthContext } from '../AuthContext';
 const SideMenu = ({ navigation, onClose }) => {
   const { user, isPro, loading, handleLogout } = useContext(AuthContext);
 
-  // ⚠️ Bloqueia acesso às telas Premium se o usuário não for assinante
   const handleNavigation = (screen) => {
     const premiumScreens = [
       'TrampayIA',
@@ -37,7 +26,6 @@ const SideMenu = ({ navigation, onClose }) => {
     navigation.navigate(screen);
   };
 
-  // 🔒 Logout completo
   const handleLogoutPress = async () => {
     Alert.alert('Confirmação', 'Você deseja mesmo sair?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -56,8 +44,7 @@ const SideMenu = ({ navigation, onClose }) => {
     ]);
   };
 
-  const userName =
-    user?.displayName || user?.legalName || user?.email?.split('@')[0] || 'Usuário';
+  const userName = user?.displayName || user?.legalName || (user?.email ? user.email.split('@')[0] : '') || 'Usuário';
 
   if (loading) {
     return (
@@ -70,8 +57,6 @@ const SideMenu = ({ navigation, onClose }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
-
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.profileIcon}>
@@ -99,50 +84,51 @@ const SideMenu = ({ navigation, onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Menu Items */}
       <View style={styles.menuContainer}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleNavigation('EditProfile')}
-        >
-          <Text style={styles.menuItemText}>Editar meus dados</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('EditProfile')}>
+          <View style={styles.menuItemRow}>
+            <Ionicons name="person-circle" size={20} color={colors.primaryDark} />
+            <Text style={styles.menuItemText}>Editar meus dados</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleNavigation('TrampayIA')}
-        >
-          <Text style={styles.menuItemText}>Trampay I.A</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TrampayIA')}>
+          <View style={styles.menuItemRow}>
+            <Ionicons name="chatbubbles" size={20} color={colors.primaryDark} />
+            <Text style={styles.menuItemText}>Trampay I.A</Text>
+          </View>
           {!isPro && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleNavigation('TaxSimulator')}
-        >
-          <Text style={styles.menuItemText}>Simulador de impostos e taxas</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TaxSimulator')}>
+          <View style={styles.menuItemRow}>
+            <MaterialIcons name="calculate" size={20} color={colors.primaryDark} />
+            <Text style={styles.menuItemText}>Simulador de impostos e taxas</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleNavigation('AssinePro')}
-        >
-          <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('AssinePro')}>
+          <View style={styles.menuItemRow}>
+            <MaterialIcons name="star" size={20} color={colors.primaryDark} />
+            <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleNavigation('Settings')}
-        >
-          <Text style={styles.menuItemText}>Configurações</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('Settings')}>
+          <View style={styles.menuItemRow}>
+            <Ionicons name="settings" size={20} color={colors.primaryDark} />
+            <Text style={styles.menuItemText}>Configurações</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
-          <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
+          <View style={styles.menuItemRow}>
+            <MaterialIcons name="logout" size={20} color={colors.error} />
+            <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
-      {/* Feature Cards */}
       <View style={styles.featureCards}>
         <TouchableOpacity
           style={[styles.featureCard, { backgroundColor: '#e8f4fd' }]}
@@ -175,7 +161,6 @@ const SideMenu = ({ navigation, onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Close Button */}
       <TouchableOpacity
         style={styles.closeButton}
         onPress={onClose || (() => navigation.goBack())}
@@ -266,6 +251,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
+  },
+  menuItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   menuItemText: { 
     fontSize: 16, 

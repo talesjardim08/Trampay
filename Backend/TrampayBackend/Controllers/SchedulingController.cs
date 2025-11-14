@@ -5,9 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace TrampayBackend.Controllers
 {
-    [ApiController]
-    [Route("api/schedules")]
-    public class SchedulingController : ControllerBase
+[ApiController]
+[Route("api/schedules")]
+[Route("api/scheduling")]
+public class SchedulingController : ControllerBase
     {
         private readonly IDbConnection _db;
         public SchedulingController(IDbConnection db) => _db = db;

@@ -1,11 +1,9 @@
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using MySqlConnector;
 using System;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,47 +18,22 @@ namespace TrampayBackend.Services
         private readonly int _jwtExpiryMinutes;
         private readonly IDbConnection _db;
 
-        public AuthService(IConfiguration cfg)
+        public AuthService(IConfiguration cfg, IDbConnection db)
         {
             _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+            _db = db ?? throw new ArgumentNullException(nameof(db));
             _jwtSecret = _cfg["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "change_this_secret";
-            _jwtExpiryMinutes = int.TryParse(_cfg["Jwt:ExpiryMinutes"], out var m) ? m : 60;
-            _db = new MySqlConnection(_cfg.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("MYSQL_CONNECTION"));
+            _jwtExpiryMinutes = int.TryParse(_cfg["Jwt:ExpireMinutes"], out var m) ? m : 60;
         }
 
-        // ========================
-        // Utilitários de senha e JWT
-        // ========================
-        public (string Hash, string Salt) HashPassword(string password, string? salt = null)
+        public string HashPassword(string password)
         {
-            byte[] saltBytes;
-            if (string.IsNullOrEmpty(salt))
-            {
-                saltBytes = new byte[16];
-                using var rng = RandomNumberGenerator.Create();
-                rng.GetBytes(saltBytes);
-                salt = Convert.ToBase64String(saltBytes);
-            }
-            else
-            {
-                saltBytes = Convert.FromBase64String(salt);
-            }
-
-            using var sha = SHA256.Create();
-            var passwordBytes = Encoding.UTF8.GetBytes(password);
-            var combined = new byte[saltBytes.Length + passwordBytes.Length];
-            Buffer.BlockCopy(saltBytes, 0, combined, 0, saltBytes.Length);
-            Buffer.BlockCopy(passwordBytes, 0, combined, saltBytes.Length, passwordBytes.Length);
-            var hashBytes = sha.ComputeHash(combined);
-            var hashHex = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-
-            return (hashHex, salt);
+            return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
-        public bool VerifyPassword(string password, string hash, string salt)
+        public bool VerifyPassword(string password, string hash)
         {
-            var (computedHash, _) = HashPassword(password, salt);
-            return string.Equals(computedHash, hash, StringComparison.OrdinalIgnoreCase);
+            return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
         public string GenerateJwtToken(long userId, string? email, string? role = "user")
@@ -87,10 +60,6 @@ namespace TrampayBackend.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        // ========================
-        // Métodos principais da API
-        // ========================
-
         public async Task<(bool Success, string Message, string? Token)> AuthenticateAsync(string email, string password)
         {
             try
@@ -101,10 +70,10 @@ namespace TrampayBackend.Services
                 if (user == null)
                     return (false, "Usuário não encontrado", null);
 
-                if (string.IsNullOrEmpty(user.PasswordSalt) || string.IsNullOrEmpty(user.PasswordHash))
+                if (string.IsNullOrEmpty(user.PasswordHash))
                     return (false, "Usuário sem senha configurada", null);
 
-                if (!VerifyPassword(password, user.PasswordHash, user.PasswordSalt))
+                if (!VerifyPassword(password, user.PasswordHash))
                     return (false, "Senha incorreta", null);
 
                 var token = GenerateJwtToken(user.Id, user.Email, "user");
@@ -126,16 +95,15 @@ namespace TrampayBackend.Services
                 if (existing != null)
                     return (false, "E-mail já registrado", null);
 
-                var (hash, salt) = HashPassword(password);
+                var hash = HashPassword(password);
                 newUser.PasswordHash = hash;
-                newUser.PasswordSalt = salt;
                 newUser.CreatedAt = DateTime.UtcNow;
                 newUser.UpdatedAt = DateTime.UtcNow;
                 newUser.IsActive = true;
 
                 const string sql = @"
-                    INSERT INTO users (AccountType, DocumentType, DocumentNumber, LegalName, DisplayName, BirthDate, Email, Phone, PasswordHash, PasswordSalt, IsActive, IsVerified, CreatedAt, UpdatedAt)
-                    VALUES (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @BirthDate, @Email, @Phone, @PasswordHash, @PasswordSalt, @IsActive, @IsVerified, @CreatedAt, @UpdatedAt);
+                    INSERT INTO users (AccountType, DocumentType, DocumentNumber, LegalName, DisplayName, BirthDate, Email, Phone, PasswordHash, IsActive, IsVerified, CreatedAt, UpdatedAt)
+                    VALUES (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @BirthDate, @Email, @Phone, @PasswordHash, @IsActive, @IsVerified, @CreatedAt, @UpdatedAt);
                     SELECT LAST_INSERT_ID();";
 
                 var id = await _db.ExecuteScalarAsync<long>(sql, newUser);

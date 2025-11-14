@@ -1,16 +1,5 @@
-// src/screens/IAScreen.js
 import React, { useState, useEffect, useContext } from "react";
-import {
-  View,
-  TextInput,
-  Button,
-  ScrollView,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import { View, TextInput, ScrollView, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, FlatList } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../services/api";
 import { AuthContext } from "../AuthContext";
@@ -22,6 +11,8 @@ export default function IAScreen({ navigation }) {
   const [currentChatId, setCurrentChatId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [chats, setChats] = useState([]);
+  const [showChats, setShowChats] = useState(false);
 
   useEffect(() => {
     if (!isPro) {
@@ -35,6 +26,25 @@ export default function IAScreen({ navigation }) {
       );
     }
   }, [isPro]);
+
+  useEffect(() => {
+    const loadChats = async () => {
+      if (!isPro) return;
+      try {
+        const res = await api.get("/ai/chats");
+        setChats(res.data || []);
+      } catch {}
+    };
+    loadChats();
+  }, [isPro]);
+
+  const loadMessages = async (chatId) => {
+    try {
+      const res = await api.get(`/ai/chats/${chatId}/messages`);
+      const mapped = (res.data || []).map((m) => ({ role: m.role, content: m.content }));
+      setMessages(mapped);
+    } catch {}
+  };
 
   const sendMessage = async () => {
     if (!message.trim()) return;
@@ -57,6 +67,7 @@ export default function IAScreen({ navigation }) {
 
       if (res.data.chatId && !currentChatId) {
         setCurrentChatId(res.data.chatId);
+        setChats((prev) => [{ id: res.data.chatId, title: "Chat IA", updated_at: new Date().toISOString(), message_count: 0 }, ...prev]);
       }
 
       setMessages((prev) => [
@@ -64,7 +75,6 @@ export default function IAScreen({ navigation }) {
         { role: "assistant", content: res.data.response },
       ]);
     } catch (e) {
-      console.error("Erro ao enviar mensagem:", e);
       Alert.alert("Erro", "Não foi possível enviar a mensagem.");
       setMessages((prev) => [
         ...prev,
@@ -119,7 +129,6 @@ export default function IAScreen({ navigation }) {
         }
       }
     } catch (e) {
-      console.error("Erro ao fazer upload:", e);
       Alert.alert("Erro", "Não foi possível processar a imagem.");
     } finally {
       setLoadingImage(false);
@@ -129,6 +138,22 @@ export default function IAScreen({ navigation }) {
   const newChat = () => {
     setCurrentChatId(null);
     setMessages([]);
+  };
+
+  const selectChat = async (chatId) => {
+    setCurrentChatId(chatId);
+    await loadMessages(chatId);
+    setShowChats(false);
+  };
+
+  const deleteChat = async (chatId) => {
+    try {
+      await api.delete(`/ai/chats/${chatId}`);
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      if (currentChatId === chatId) {
+        newChat();
+      }
+    } catch {}
   };
 
   if (!isPro) {
@@ -149,11 +174,32 @@ export default function IAScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>IA Assistant 🤖</Text>
-        <TouchableOpacity onPress={newChat}>
-          <Text style={styles.newChatButton}>Novo Chat</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>IA Assistant</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => setShowChats(!showChats)} style={styles.headerButton}><Text style={styles.headerButtonText}>Conversas</Text></TouchableOpacity>
+          <TouchableOpacity onPress={newChat} style={styles.headerButton}><Text style={styles.headerButtonText}>Novo Chat</Text></TouchableOpacity>
+        </View>
       </View>
+
+      {showChats && (
+        <View style={styles.chatsPanel}>
+          <FlatList
+            data={chats}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => (
+              <View style={styles.chatItemRow}>
+                <TouchableOpacity style={styles.chatItem} onPress={() => selectChat(item.id)}>
+                  <Text style={styles.chatTitle}>{item.title || "Chat IA"}</Text>
+                  <Text style={styles.chatMeta}>{item.message_count} mensagens</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chatDelete} onPress={() => deleteChat(item.id)}>
+                  <Text style={styles.chatDeleteText}>Excluir</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </View>
+      )}
 
       <ScrollView style={styles.chatContainer}>
         {messages.map((msg, i) => (
@@ -192,14 +238,8 @@ export default function IAScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.uploadButton}
-        onPress={uploadImage}
-        disabled={loadingImage || loading}
-      >
-        <Text style={styles.uploadButtonText}>
-          {loadingImage ? "Processando..." : "📷 Analisar Imagem (OCR)"}
-        </Text>
+      <TouchableOpacity style={styles.uploadButton} onPress={uploadImage} disabled={loadingImage || loading}>
+        <Text style={styles.uploadButtonText}>{loadingImage ? "Processando..." : "Analisar Imagem (OCR)"}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -223,10 +263,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
   },
-  newChatButton: {
-    color: "#007AFF",
-    fontSize: 14,
-  },
+  headerActions: { flexDirection: "row", gap: 8 },
+  headerButton: { backgroundColor: "#007AFF", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  headerButtonText: { color: "#fff" },
+  chatsPanel: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
+  chatItemRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
+  chatItem: { flex: 1 },
+  chatTitle: { fontSize: 16, fontWeight: "600" },
+  chatMeta: { fontSize: 12, color: "#666" },
+  chatDelete: { marginLeft: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#eee", borderRadius: 8 },
+  chatDeleteText: { color: "#d00" },
   chatContainer: {
     flex: 1,
     padding: 10,

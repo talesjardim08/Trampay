@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 using System;
 using System.Net;
 using System.Text.Json;
@@ -27,7 +27,6 @@ namespace TrampayBackend.Middleware
             }
             catch (MySqlException sqlEx)
             {
-                // Erros específicos de banco de dados
                 _logger.LogError(sqlEx, "[MySQL ERROR] Erro de banco de dados capturado.");
 
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -43,7 +42,6 @@ namespace TrampayBackend.Middleware
             }
             catch (UnauthorizedAccessException ex)
             {
-                // Erros de autenticação/autorização
                 _logger.LogWarning(ex, "[AUTH ERROR] Acesso não autorizado.");
 
                 context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
@@ -59,7 +57,6 @@ namespace TrampayBackend.Middleware
             }
             catch (Exception ex)
             {
-                // Qualquer outro erro inesperado
                 _logger.LogError(ex, "[SERVER ERROR] Erro não tratado.");
 
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -76,7 +73,6 @@ namespace TrampayBackend.Middleware
         }
     }
 
-    // Extensão opcional para facilitar Program.cs
     public static class ErrorHandlerExtension
     {
         public static IApplicationBuilder UseErrorHandler(this IApplicationBuilder app)
