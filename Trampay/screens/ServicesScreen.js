@@ -31,6 +31,10 @@ const ServicesScreen = ({ navigation }) => {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('calendar');
   const [loading, setLoading] = useState(false);
+  const [serviceTemplates, setServiceTemplates] = useState([]);
+  const [templateModalVisible, setTemplateModalVisible] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateDetailsModalVisible, setTemplateDetailsModalVisible] = useState(false);
 
   useEffect(() => {
     loadData();

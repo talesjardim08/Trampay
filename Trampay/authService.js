@@ -1,5 +1,3 @@
-// project/Trampay-main/Trampay/authService.js
-// src/screens/authService.js
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -13,7 +11,6 @@ const api = axios.create({
 async function saveToken(token) {
   try {
     await AsyncStorage.setItem("token", token);
-    console.log("[Auth] Token salvo com sucesso.");
   } catch (err) {
     console.error("Erro ao salvar token:", err);
   }
@@ -31,7 +28,6 @@ export async function clearLocalCache() {
       "trampay_transactions_outbox",
       "userEvents",
     ]);
-    console.log("[Auth] Cache local limpo após novo login.");
   } catch (err) {
     console.error("[Auth] Falha ao limpar cache:", err);
   }
@@ -49,13 +45,9 @@ export async function login(email, senha) {
     }
 
     await saveToken(response.data.token);
-
     await clearLocalCache();
-
-    console.log("[Auth] Login realizado com sucesso. Cache limpo.");
     return response.data;
   } catch (error) {
-    console.error("❌ Erro no login:", error.response?.data || error.message);
     const err = new Error(
       error.response?.data?.error || error.response?.data?.message || error.message || "Falha ao entrar"
     );
@@ -76,14 +68,10 @@ export async function registerUser(userData) {
     documentNumber: userData.DocumentNumber || '',
   };
 
-  console.log("📦 Enviando payload:", payload);
-
   try {
     const res = await api.post("/auth/register", payload);
-    console.log("✅ Registro concluído com sucesso:", res.data);
     return { success: true, data: res.data };
   } catch (err) {
-    console.error("❌ Erro no registro:", err.response?.data || err.message);
     const msg =
       err.response?.data?.error ||
       err.response?.data?.message ||
@@ -101,7 +89,6 @@ export async function forgotPassword(payload) {
         response.data?.message || "E-mail de redefinição enviado com sucesso.",
     };
   } catch (error) {
-    console.error("Erro no esqueci senha:", error.response?.data || error.message);
     return {
       success: false,
       message:
@@ -115,16 +102,31 @@ export async function getUserProfile() {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
-      console.warn("[Auth] Nenhum token encontrado. Usuário não autenticado.");
       return null;
     }
 
-    const response = await api.get("/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    let resp;
+    try {
+      resp = await api.get("/users/me", { headers: { Authorization: `Bearer ${token}` } });
+    } catch (err) {
+      try {
+        resp = await api.get("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+      } catch (err2) {
+        resp = await api.get("/auth/profile", { headers: { Authorization: `Bearer ${token}` } });
+      }
+    }
 
-    console.log("[Auth] Perfil obtido do servidor:", response.data?.email);
-    return response.data;
+    const raw = resp?.data || {};
+    const profile = {
+      id: raw.id || raw.Id,
+      displayName: raw.display_name || raw.displayName || raw.name || "",
+      email: raw.email || "",
+      phone: raw.phone || "",
+      isPro: !!(raw.is_premium || raw.isPremium || raw.isPro),
+      createdAt: raw.created_at || raw.createdAt || null,
+    };
+
+    return profile;
   } catch (error) {
     console.error("Erro ao obter perfil:", error.response?.data || error.message);
     return null;
@@ -142,7 +144,6 @@ export async function logout() {
       "userProfile",
       "someOtherKeyIfExists"
     ]);
-    console.log("[Auth] Logout completo e cache limpo.");
   } catch (error) {
     console.error("Erro ao sair:", error);
   }

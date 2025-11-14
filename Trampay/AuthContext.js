@@ -1,39 +1,26 @@
-// src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserProfile, login, logout, registerUser } from "./authService";
 import { Alert } from "react-native";
 import api from "./services/api";
 
-// ---------------------------------------------
-// 🧭 Contexto de Autenticação
-// ---------------------------------------------
 export const AuthContext = createContext();
 
-// ---------------------------------------------
-// ⚙️ Provedor de Autenticação
-// ---------------------------------------------
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ---------------------------------------------
-  // 🔁 Verifica login automático ao iniciar o app
-  // ---------------------------------------------
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
         if (token) {
-          console.log("[AuthContext] Token encontrado, obtendo perfil...");
           const profile = await getUserProfile();
           if (profile) {
             setUser(profile);
-            setIsPro(profile.isPremium || profile.isPro || false);
+            setIsPro(Boolean(profile.isPro));
           }
-        } else {
-          console.log("[AuthContext] Nenhum token encontrado.");
         }
       } catch (error) {
         console.error("[AuthContext] Erro ao verificar login:", error);
@@ -44,9 +31,6 @@ export const AuthProvider = ({ children }) => {
     checkLoginStatus();
   }, []);
 
-  // ---------------------------------------------
-  // 🔑 Função de Login
-  // ---------------------------------------------
   const handleLogin = async (email, senha) => {
     try {
       setLoading(true);
@@ -55,7 +39,7 @@ export const AuthProvider = ({ children }) => {
         const profile = await getUserProfile();
         if (profile) {
           setUser(profile);
-          setIsPro(profile.isPremium || profile.isPro || false);
+          setIsPro(Boolean(profile.isPro));
           Alert.alert("✅ Login realizado com sucesso!");
         }
       }
@@ -67,9 +51,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------------------------------------
-  // 🧾 Registro
-  // ---------------------------------------------
   const handleRegister = async (userData) => {
     try {
       setLoading(true);
@@ -86,9 +67,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------------------------------------
-  // 🚪 Logout
-  // ---------------------------------------------
   const handleLogout = async () => {
     try {
       setLoading(true);
@@ -103,9 +81,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------------------------------------
-  // 💎 Atualiza status PRO (assinatura)
-  // ---------------------------------------------
   const activatePro = async () => {
     try {
       setLoading(true);
@@ -116,13 +91,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       const response = await api.post('/subscription/activate');
-      
       if (response.data.success) {
-        // Recarrega perfil para obter dados atualizados
         const profile = await getUserProfile();
         if (profile) {
           setUser(profile);
-          setIsPro(profile.isPremium || false);
+          setIsPro(Boolean(profile.isPro));
         }
         Alert.alert("💎 Parabéns!", "Sua conta PRO foi ativada com sucesso!");
       }
@@ -134,9 +107,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------------------------------------
-  // 🧩 Valor global do contexto
-  // ---------------------------------------------
   const value = {
     user,
     setUser,

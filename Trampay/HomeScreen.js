@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Removed AsyncStorage import - using AsyncStorage for all storage
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import api from './services/api';
+import { getUserProfile } from './authService';
 import { fetchBalance, adjustBalance } from './services/balanceService';
 import { fetchAnalyticsSummary, fetchExpensesByCategory, fetchRevenueByCategory } from './services/analyticsService';
 import { colors, fonts, spacing } from './styles';
@@ -164,9 +165,9 @@ const HomeScreen = ({ navigation, route }) => {
   // --- Fetch profile from backend
   const fetchProfileFromServer = async () => {
     try {
-      const resp = await api.get('/auth/me');
-      console.log('[Home] perfil obtido do servidor:', resp?.data?.name || resp?.data?.email);
-      return resp.data;
+      const profile = await getUserProfile();
+      console.log('[Home] perfil obtido do servidor:', profile?.displayName || profile?.email);
+      return profile;
     } catch (err) {
       console.warn('[Home] falha ao buscar perfil no servidor:', err?.response?.data || err.message);
       return null;
@@ -196,7 +197,8 @@ const HomeScreen = ({ navigation, route }) => {
         // mantém a estrutura mínima esperada — ajuste campo a campo conforme backend
         title: transaction.description || transaction.name || 'Transação',
         amount: transaction.amount,
-        type: transaction.type, // 'income'|'expense'
+        type: transaction.type // 'income'|'expense'
+        ,
         currency: transaction.currency || 'BRL',
         transactionDate: transaction.transactionDate || transaction.createdAt,
         category: transaction.category || 'Sem categoria',
@@ -594,6 +596,11 @@ const HomeScreen = ({ navigation, route }) => {
                   {userName.charAt(0).toUpperCase()}
                 </Text>
               </View>
+              {isPro && (
+                <View style={{ position: 'absolute', right: -4, bottom: -4, backgroundColor: '#FFD84D', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#0F1724' }}>PRO</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.greeting}>
               Olá, {'\n'}<Text style={styles.userName}>{userName}</Text>

@@ -15,7 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, fonts, spacing } from '../styles';
 import { fetchBalance } from '../services/balanceService';
-import api from '../authService';
+import api from '../services/api';
 import AddTransactionModal from '../components/AddTransactionModal';
 import PieChart from '../components/PieChart';
 import LineChart from '../components/LineChart';
@@ -32,6 +32,7 @@ const CashFlowScreen = ({ navigation }) => {
   const [showMovements, setShowMovements] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [transactionDetailsVisible, setTransactionDetailsVisible] = useState(false);
+  const [cashflowData, setCashflowData] = useState([]);
 
   // Chaves de armazenamento
   const TRANSACTIONS_STORAGE_KEY = 'trampay_transactions';
@@ -49,11 +50,23 @@ const CashFlowScreen = ({ navigation }) => {
         }
         const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
         if (resp?.data && Array.isArray(resp.data)) {
-          // opcional: usar resp.data para melhorar cálculo de gráficos, mantendo compatibilidade
+          setCashflowData(resp.data);
         }
       } catch (err) {}
     })();
   }, []);
+
+  // Recarrega dados do gráfico ao trocar período
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
+        if (resp?.data && Array.isArray(resp.data)) {
+          setCashflowData(resp.data);
+        }
+      } catch (err) {}
+    })();
+  }, [periodTab]);
 
   // Carregar transações
   const loadTransactions = async () => {
@@ -134,54 +147,45 @@ const CashFlowScreen = ({ navigation }) => {
 
   // Calcular resumo financeiro
   const getFinancialSummary = () => {
+    // Se houver dados do backend, usa eles para o resumo
+    if (cashflowData && cashflowData.length > 0) {
+      const income = cashflowData.reduce((sum, row) => sum + (Number(row.income) || 0), 0);
+      const expenses = cashflowData.reduce((sum, row) => sum + (Number(row.expenses) || 0), 0);
+      const total = income + expenses;
+      const incomePercentage = total > 0 ? (income / total) * 100 : 50;
+      const expensePercentage = total > 0 ? (expenses / total) * 100 : 50;
+      return {
+        income,
+        expenses,
+        incomePercentage: incomePercentage.toFixed(1),
+        expensePercentage: expensePercentage.toFixed(1),
+        total,
+      };
+    }
+
+    // Fallback para dados locais
     const now = new Date();
     let startDate;
-    
     if (periodTab === 'monthly') {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     } else {
-      // Últimos 7 dias (alinhado com HomeScreen) - normalizar para 00:00
       startDate = new Date(now.getTime() - (6 * 24 * 60 * 60 * 1000));
       startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     }
-
     const periodTransactions = transactions.filter(transaction => {
-      // Use transactionDate se disponível, senão use createdAt (alinhado com HomeScreen)
       const transactionDateStr = transaction.transactionDate || transaction.createdAt;
       const transactionDate = new Date(transactionDateStr);
-      
-      // Exclui transações com datas inválidas
-      if (isNaN(transactionDate.getTime())) {
-        return false;
-      }
-      
-      // Filtrar apenas moeda base (BRL) e transações concluídas
+      if (isNaN(transactionDate.getTime())) return false;
       const isBaseCurrency = (transaction.currency || 'BRL') === 'BRL';
       const isConcluded = transaction.status === 'concluído';
-      
-      return transactionDate >= startDate && transactionDate <= now &&
-             isBaseCurrency && isConcluded;
+      return transactionDate >= startDate && transactionDate <= now && isBaseCurrency && isConcluded;
     });
-
-    const income = periodTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const expenses = periodTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    const income = periodTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expenses = periodTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const total = income + expenses;
     const incomePercentage = total > 0 ? (income / total) * 100 : 50;
     const expensePercentage = total > 0 ? (expenses / total) * 100 : 50;
-
-    return {
-      income,
-      expenses,
-      incomePercentage: incomePercentage.toFixed(1),
-      expensePercentage: expensePercentage.toFixed(1),
-      total
-    };
+    return { income, expenses, incomePercentage: incomePercentage.toFixed(1), expensePercentage: expensePercentage.toFixed(1), total };
   };
 
   // Filtrar movimentações

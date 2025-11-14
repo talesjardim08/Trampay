@@ -1,6 +1,6 @@
-// project/Trampay-main/Trampay/components/SideMenu.js
 import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, StatusBar, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
 import { AuthContext } from '../AuthContext';
@@ -85,7 +85,7 @@ const SideMenu = ({ navigation, onClose }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <View style={{ flex: 1 }}>
         <View style={styles.menuContainer}>
           <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('EditProfile')}>
             <View style={styles.menuItemRow}>
@@ -169,7 +169,7 @@ const SideMenu = ({ navigation, onClose }) => {
         >
           <Text style={styles.closeButtonText}>Fechar Menu</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -246,8 +246,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.white,
   },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: spacing.xl * 2 },
   menuContainer: { 
     paddingHorizontal: spacing.lg, 
     paddingTop: spacing.lg,
