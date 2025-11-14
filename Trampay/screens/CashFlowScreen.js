@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SecureStorage from '../utils/SecureStorage';
+import { emit, on, Events } from '../utils/EventBus';
 import { colors, fonts, spacing } from '../styles';
 import { fetchBalance } from '../services/balanceService';
 import api from '../services/api';
@@ -42,6 +44,7 @@ const CashFlowScreen = ({ navigation }) => {
   useEffect(() => {
     loadTransactions();
     loadBalance();
+    (async () => { try { await SecureStorage.migrateExistingData(TRANSACTIONS_STORAGE_KEY); } catch {} })();
     (async () => {
       try {
         const serverBalance = await fetchBalance('BRL');
@@ -71,9 +74,10 @@ const CashFlowScreen = ({ navigation }) => {
   // Carregar transações
   const loadTransactions = async () => {
     try {
-      const stored = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+      const stored = await SecureStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (stored) {
-        const transactionsList = JSON.parse(stored);
+        const transactionsList = Array.isArray(stored) ? stored : [];
+        transactionsList.sort((a,b)=> new Date(b.transactionDate||b.createdAt) - new Date(a.transactionDate||a.createdAt));
         setTransactions(transactionsList);
       }
     } catch (error) {
@@ -84,8 +88,8 @@ const CashFlowScreen = ({ navigation }) => {
   // Carregar saldo
   const loadBalance = async () => {
     try {
-      const stored = await AsyncStorage.getItem(BALANCE_STORAGE_KEY);
-      if (stored) {
+      const stored = await SecureStorage.getItem(BALANCE_STORAGE_KEY);
+      if (stored !== null && stored !== undefined) {
         setBalance(parseFloat(stored));
       }
     } catch (error) {
@@ -96,8 +100,10 @@ const CashFlowScreen = ({ navigation }) => {
   // Salvar transações
   const saveTransactions = async (transactionsList) => {
     try {
-      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactionsList));
-      setTransactions(transactionsList);
+      const sorted = [...transactionsList].sort((a,b)=> new Date(b.transactionDate||b.createdAt) - new Date(a.transactionDate||a.createdAt));
+      await SecureStorage.setItem(TRANSACTIONS_STORAGE_KEY, sorted);
+      setTransactions(sorted);
+      emit(Events.TransactionsUpdated, sorted);
     } catch (error) {
       console.error('Erro ao salvar transações:', error);
       Alert.alert('Erro', 'Não foi possível salvar a transação');
@@ -107,8 +113,9 @@ const CashFlowScreen = ({ navigation }) => {
   // Salvar saldo
   const saveBalance = async (newBalance) => {
     try {
-      await AsyncStorage.setItem(BALANCE_STORAGE_KEY, newBalance.toString());
+      await SecureStorage.setItem(BALANCE_STORAGE_KEY, newBalance);
       setBalance(newBalance);
+      emit(Events.BalanceUpdated, newBalance);
     } catch (error) {
       console.error('Erro ao salvar saldo:', error);
     }
@@ -144,6 +151,16 @@ const CashFlowScreen = ({ navigation }) => {
 
     setAddTransactionVisible(false);
   };
+
+  useEffect(() => {
+    const unsubBalance = on(Events.BalanceUpdated, (val) => {
+      if (typeof val === 'number') setBalance(val);
+    });
+    const unsubTx = on(Events.TransactionsUpdated, (list) => {
+      if (Array.isArray(list)) setTransactions(list);
+    });
+    return () => { unsubBalance(); unsubTx(); };
+  }, []);
 
   // Calcular resumo financeiro
   const getFinancialSummary = () => {

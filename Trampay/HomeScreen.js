@@ -190,6 +190,16 @@ const HomeScreen = ({ navigation, route }) => {
     }, [])
   );
 
+  useEffect(() => {
+    const unsubBalance = on(Events.BalanceUpdated, (val) => {
+      if (typeof val === 'number') setBalance(val);
+    });
+    const unsubTx = on(Events.TransactionsUpdated, (list) => {
+      if (Array.isArray(list)) setUserTransactions(list);
+    });
+    return () => { unsubBalance(); unsubTx(); };
+  }, []);
+
   // --- Fetch transactions from backend
   const fetchTransactionsFromServer = async (params = {}) => {
     try {
@@ -2263,3 +2273,4 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+import { on, Events } from './utils/EventBus';

@@ -33,6 +33,8 @@ export const fonts = {
   bold: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto-Bold'
 };
 
+export const typeScale = { h1: 28, h2: 22, h3: 18, body: 16 };
+
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -47,6 +49,17 @@ export const borderRadius = {
   md: 12,
   lg: 16,
   xl: 24
+};
+
+export const breakpoints = { mobileMin: 360, tabletMin: 768, desktopMin: 1024 };
+
+export const palette = {
+  primary: { base: colors.primary, light: '#ffe08a', dark: colors.primaryDark },
+  secondary: { base: colors.secondary, light: '#f2f7ff', dark: '#c6ddff' },
+  neutral: { 50: '#f9f9fb', 100: colors.lightGray, 200: '#dcdcdc', 400: colors.border, 700: colors.textLight, 900: colors.textDark || '#1f3654' },
+  success: { base: colors.success, dark: '#00a142' },
+  warning: { base: colors.warning, light: '#fff1cc' },
+  error: { base: colors.error, dark: '#cc3737' }
 };
 
 // Estilos globais reutilizáveis

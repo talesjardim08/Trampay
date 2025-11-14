@@ -131,6 +131,22 @@ export default function IAScreen({ navigation }) {
         </View>
       </View>
 
+      <View style={styles.contextPanel} accessibilityLabel="Contexto e sugestões de uso da IA">
+        <Text style={styles.contextTitle}>Assistente para Microempreendedores</Text>
+        <Text style={styles.contextText}>Peça ajuda para precificar serviços, organizar fluxo de caixa e atrair clientes.</Text>
+        <View style={styles.suggestionsRow}>
+          <TouchableOpacity style={styles.suggestionChip} onPress={() => { setMessage("Me ajude a precificar um serviço de pintura residencial de 50m²."); }} accessibilityRole="button" accessibilityLabel="Sugestão de precificação">
+            <Text style={styles.suggestionText}>Precificação</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.suggestionChip} onPress={() => { setMessage("Organize meu fluxo de caixa do mês com entradas e saídas previstas."); }} accessibilityRole="button" accessibilityLabel="Sugestão de fluxo de caixa">
+            <Text style={styles.suggestionText}>Fluxo de Caixa</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.suggestionChip} onPress={() => { setMessage("Sugira estratégias simples para conseguir novos clientes nesta semana."); }} accessibilityRole="button" accessibilityLabel="Sugestão de prospecção">
+            <Text style={styles.suggestionText}>Prospecção</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {showChats && (
         <View style={styles.chatsPanel}>
           <FlatList
@@ -216,6 +232,12 @@ const styles = StyleSheet.create({
   input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginRight: spacing.sm, maxHeight: 100 },
   sendButton: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, justifyContent: "center" },
   sendButtonText: { color: colors.white, fontFamily: fonts.bold },
+  contextPanel: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, margin: spacing.sm, padding: spacing.md },
+  contextTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 18 },
+  contextText: { fontFamily: fonts.regular, color: colors.text, marginTop: spacing.xs },
+  suggestionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  suggestionChip: { backgroundColor: colors.secondary, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  suggestionText: { color: colors.text, fontFamily: fonts.medium },
   uploadButton: {
     backgroundColor: "#34C759",
     padding: 15,

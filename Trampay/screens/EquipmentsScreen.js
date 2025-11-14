@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '../services/api';
+import { listServices } from '../ServicesService';
 import { colors, fonts, spacing } from '../styles';
 import AddEquipmentModal from '../components/AddEquipmentModal';
 import EquipmentDetailsModal from '../components/EquipmentDetailsModal';
@@ -23,10 +24,23 @@ const EquipmentsScreen = ({ navigation }) => {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
     loadEquipments();
+    loadServicesSafe();
   }, []);
+
+  const loadServicesSafe = async () => {
+    try {
+      const data = await listServices();
+      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+      setServices(items.map(s => ({ id: s.id, name: s.name || s.title || `Serviço ${s.id}` })));
+    } catch (error) {
+      console.error('Erro ao carregar serviços (EquipmentsScreen):', error);
+      setServices([]);
+    }
+  };
 
   const loadEquipments = async () => {
     try {
@@ -321,7 +335,7 @@ const EquipmentsScreen = ({ navigation }) => {
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
         onAdd={handleAddEquipment}
-        services={services}
+        services={services || []}
       />
 
       <EquipmentDetailsModal
@@ -329,7 +343,7 @@ const EquipmentsScreen = ({ navigation }) => {
         onClose={() => setDetailsModalVisible(false)}
         equipment={selectedEquipment}
         onEdit={handleEditEquipment}
-        services={services}
+        services={services || []}
       />
     </View>
   );

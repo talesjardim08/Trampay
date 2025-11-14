@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '../services/api';
+import { listServices } from '../ServicesService';
 import { colors, fonts, spacing } from '../styles';
 import AddStockItemModal from '../components/AddStockItemModal';
 import StockItemDetailsModal from '../components/StockItemDetailsModal';
@@ -23,10 +24,23 @@ const StockScreen = ({ navigation }) => {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
     loadStockItems();
+    loadServicesSafe();
   }, []);
+
+  const loadServicesSafe = async () => {
+    try {
+      const data = await listServices();
+      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+      setServices(items.map(s => ({ id: s.id, name: s.name || s.title || `Serviço ${s.id}` })));
+    } catch (error) {
+      console.error('Erro ao carregar serviços (StockScreen):', error);
+      setServices([]);
+    }
+  };
 
   const loadStockItems = async () => {
     try {
@@ -303,7 +317,7 @@ const StockScreen = ({ navigation }) => {
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
         onAdd={handleAddItem}
-        services={services}
+        services={services || []}
       />
 
       <StockItemDetailsModal
@@ -311,7 +325,7 @@ const StockScreen = ({ navigation }) => {
         onClose={() => setDetailsModalVisible(false)}
         item={selectedItem}
         onEdit={handleEditItem}
-        services={services}
+        services={services || []}
       />
     </View>
   );
