@@ -228,6 +228,11 @@ const AppRoutes = () => {
           component={ProUpgradeScreen}
           options={{ headerShown: false }}
         />
+        <Stack.Screen 
+          name="Analytics" 
+          component={require('./screens/AnalyticsDashboardScreen').default}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -195,6 +195,66 @@ namespace TrampayBackend.Controllers
             }
         }
 
+        [Authorize]
+        [HttpPost("analyze-image")]
+        public async Task<IActionResult> AnalyzeImage([FromForm] IFormFile file)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst("id")?.Value;
+                if (!long.TryParse(userIdClaim, out var userId)) 
+                    return Unauthorized(new { error = "Token inválido" });
+
+                // Verificar se usuário é premium (obrigatório para usar OCR)
+                var isPremium = await _db.QueryFirstOrDefaultAsync<bool?>(
+                    "SELECT is_premium FROM users WHERE id = @userId AND (premium_until IS NULL OR premium_until > NOW()) LIMIT 1",
+                    new { userId });
+
+                if (isPremium != true)
+                    return StatusCode(403, new { error = "Recurso exclusivo para usuários PRO" });
+
+                // Validar arquivo
+                if (file == null || file.Length == 0)
+                    return BadRequest(new { error = "Arquivo é obrigatório" });
+
+                // Validar tipo de arquivo (apenas imagens)
+                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif", "image/bmp" };
+                if (!allowedTypes.Contains(file.ContentType?.ToLower()))
+                    return BadRequest(new { error = "Apenas arquivos de imagem são permitidos (JPEG, PNG, GIF, BMP)" });
+
+                // Validar tamanho (máx 5MB)
+                if (file.Length > 5 * 1024 * 1024)
+                    return BadRequest(new { error = "Arquivo muito grande. Tamanho máximo: 5MB" });
+
+                // Processar imagem com OCR
+                var extractedText = await _aiService.AnalyzeImageAsync(file);
+
+                // Salvar histórico de OCR (opcional)
+                var insertOcrSql = @"INSERT INTO ai_ocr_history (user_id, filename, extracted_text, created_at) 
+                                     VALUES (@userId, @filename, @extractedText, NOW())";
+                try
+                {
+                    await _db.ExecuteAsync(insertOcrSql, new { userId, filename = file.FileName, extractedText });
+                }
+                catch
+                {
+                    // Ignora erro se a tabela não existir
+                }
+
+                return Ok(new { 
+                    success = true, 
+                    text = extractedText,
+                    filename = file.FileName,
+                    message = "Imagem processada com sucesso"
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AI/OCR ERROR] {ex.Message}\n{ex.StackTrace}");
+                return Problem(detail: ex.Message, title: "Erro ao processar imagem");
+            }
+        }
+
     }
 
     // Request DTOs
