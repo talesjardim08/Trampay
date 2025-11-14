@@ -3,70 +3,142 @@ using Microsoft.AspNetCore.Mvc;
 using System.Data;
 using Dapper;
 using System.Threading.Tasks;
+using System;
 
 namespace TrampayBackend.Controllers
 {
     [ApiController]
-    [Route("api/auth")]
+    [Route("api/auth/profile")]
     public class AuthProfileController : ControllerBase
     {
         private readonly IDbConnection _db;
+
         public AuthProfileController(IDbConnection db)
         {
             _db = db;
         }
 
+        /// <summary>
+        /// Retorna o perfil completo do usuário logado
+        /// </summary>
+        [HttpGet]
         [Authorize]
-        [HttpGet("profile")]
         public async Task<IActionResult> GetProfile()
         {
-            var userIdClaim = User.FindFirst("id")?.Value;
-            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+            try
+            {
+                var userId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { error = "Token inválido ou expirado." });
 
-            var user = await _db.QueryFirstOrDefaultAsync(@"
-                SELECT id, email, display_name AS displayName, phone, is_premium AS isPremium, premium_until AS premiumUntil
-                FROM users WHERE id = @id LIMIT 1", new { id = userIdClaim });
+                var sql = @"
+                    SELECT 
+                        id_user, 
+                        name, 
+                        email, 
+                        phone, 
+                        created_at
+                    FROM users 
+                    WHERE id_user = @id LIMIT 1";
 
-            if (user == null) return NotFound();
-            return Ok(user);
+                var profile = await _db.QueryFirstOrDefaultAsync(sql, new { id = userId });
+
+                if (profile == null)
+                    return NotFound(new { error = "Usuário não encontrado." });
+
+                return Ok(profile);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Erro interno ao obter o perfil.", detail = ex.Message });
+            }
         }
 
-        // Alias endpoint for compatibility
+        /// <summary>
+        /// Atualiza nome, email ou telefone
+        /// </summary>
+        [HttpPut]
         [Authorize]
-        [HttpGet("me")]
-        public async Task<IActionResult> GetMe()
+        public async Task<IActionResult> UpdateProfile([FromBody] dynamic body)
         {
-            return await GetProfile();
+            try
+            {
+                var userId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { error = "Token inválido ou expirado." });
+
+                string name = body?.name;
+                string email = body?.email;
+                string phone = body?.phone;
+
+                var sql = @"
+                    UPDATE users 
+                    SET 
+                        name = COALESCE(@name, name),
+                        email = COALESCE(@email, email),
+                        phone = COALESCE(@phone, phone)
+                    WHERE id_user = @id";
+
+                await _db.ExecuteAsync(sql, new
+                {
+                    id = userId,
+                    name,
+                    email,
+                    phone
+                });
+
+                return Ok(new { message = "Perfil atualizado com sucesso." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Erro interno ao atualizar o perfil.", detail = ex.Message });
+            }
         }
 
+        /// <summary>
+        /// Atualiza a senha do usuário
+        /// </summary>
+        [HttpPut("password")]
         [Authorize]
-        [HttpPut("profile")]
-        public async Task<IActionResult> UpdateProfile([FromBody] ProfileUpdateDto body)
+        public async Task<IActionResult> UpdatePassword([FromBody] dynamic body)
         {
-            var userIdClaim = User.FindFirst("id")?.Value;
-            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+            try
+            {
+                var userId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { error = "Token inválido ou expirado." });
 
-            if (body == null || string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.DisplayName))
-                return BadRequest(new { error = "Campos obrigatórios faltando." });
+                string currentPassword = body?.currentPassword;
+                string newPassword = body?.newPassword;
 
-            await _db.ExecuteAsync(@"UPDATE users SET 
-                email=@Email, display_name=@DisplayName, phone=@Phone, updated_at=NOW() 
-                WHERE id=@Id",
-                new { Email = body.Email, DisplayName = body.DisplayName, Phone = body.Phone, Id = userIdClaim });
+                if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+                    return BadRequest(new { error = "Senha atual e nova senha são obrigatórias." });
 
-            var updated = await _db.QueryFirstAsync(@"
-                SELECT id, email, display_name AS displayName, phone, is_premium AS isPremium, premium_until AS premiumUntil 
-                FROM users WHERE id = @Id LIMIT 1", new { Id = userIdClaim });
+                // Obtém hash atual
+                var sqlGet = "SELECT password FROM users WHERE id_user = @id LIMIT 1";
+                var storedHash = await _db.ExecuteScalarAsync<string>(sqlGet, new { id = userId });
 
-            return Ok(updated);
+                if (storedHash == null)
+                    return Unauthorized(new { error = "Usuário não encontrado." });
+
+                // Verifica senha
+                bool valid = BCrypt.Net.BCrypt.Verify(currentPassword, storedHash);
+                if (!valid)
+                    return BadRequest(new { error = "Senha atual incorreta." });
+
+                // Gera novo hash
+                string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+
+                // Atualiza no BD
+                var sqlUpdate = "UPDATE users SET password = @hash WHERE id_user = @id";
+                await _db.ExecuteAsync(sqlUpdate, new { id = userId, hash = newHash });
+
+                return Ok(new { message = "Senha atualizada com sucesso." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Erro interno ao atualizar a senha.", detail = ex.Message });
+            }
         }
-    }
-
-    public class ProfileUpdateDto
-    {
-        public string Email { get; set; }
-        public string DisplayName { get; set; }
-        public string Phone { get; set; }
-        public string Password { get; set; } // opcional
     }
 }

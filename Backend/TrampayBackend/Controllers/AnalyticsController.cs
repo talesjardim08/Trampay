@@ -2,6 +2,9 @@ using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
 
 namespace TrampayBackend.Controllers
 {
@@ -10,202 +13,160 @@ namespace TrampayBackend.Controllers
     public class AnalyticsController : ControllerBase
     {
         private readonly IDbConnection _db;
-        public AnalyticsController(IDbConnection db) => _db = db;
+        private readonly ILogger<AnalyticsController> _logger;
 
-        // Dashboard summary - total receitas, despesas, clientes, serviços
+        public AnalyticsController(IDbConnection db, ILogger<AnalyticsController> logger)
+        {
+            _db = db;
+            _logger = logger;
+        }
+
+        // ========================================================================
+        // 1. RESUMO GERAL (REVENUE, EXPENSES, CLIENTS, SERVICES, ETC.)
+        // ========================================================================
         [HttpGet("summary")]
         [Authorize]
-        public async Task<IActionResult> GetSummary([FromQuery] string? period = "month")
+        public async Task<IActionResult> GetSummary()
         {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
-
-            var dateFilter = period switch
+            try
             {
-                "week" => "DATE_SUB(NOW(), INTERVAL 7 DAY)",
-                "month" => "DATE_SUB(NOW(), INTERVAL 30 DAY)",
-                "year" => "DATE_SUB(NOW(), INTERVAL 365 DAY)",
-                _ => "DATE_SUB(NOW(), INTERVAL 30 DAY)"
-            };
+                var sql = @"
+                    SELECT
+                        COALESCE(SUM(CASE WHEN type = 'income'  THEN amount END), 0) AS Income,
+                        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS Expenses,
+                        (SELECT COUNT(*) FROM clients) AS Clients,
+                        (SELECT COUNT(*) FROM services) AS Services,
+                        0 AS InventoryValue,
+                        (SELECT COUNT(*) FROM events WHERE date >= CURRENT_DATE()) AS UpcomingEvents
+                    FROM transactions;
+                ";
 
-            var sql = $@"
-                SELECT 
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'receita' AND transaction_date >= {dateFilter}) as totalRevenue,
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'despesa' AND transaction_date >= {dateFilter}) as totalExpenses,
-                    (SELECT COUNT(*) FROM clients WHERE owner_user_id = @UserId) as totalClients,
-                    (SELECT COUNT(*) FROM services WHERE owner_user_id = @UserId) as totalServices,
-                    (SELECT COALESCE(SUM(quantity * selling_price), 0) FROM inventory_items WHERE owner_user_id = @UserId) as inventoryValue,
-                    (SELECT COUNT(*) FROM events WHERE owner_user_id = @UserId AND event_date >= CURDATE() AND status = 'pending') as upcomingEvents
-            ";
+                var result = await _db.QueryFirstOrDefaultAsync(sql);
 
-            var summary = await _db.QueryFirstOrDefaultAsync(sql, new { UserId = userId });
-            return Ok(summary);
+                return Ok(new
+                {
+                    income = result.Income,
+                    expenses = result.Expenses,
+                    clients = result.Clients,
+                    services = result.Services,
+                    inventoryValue = result.InventoryValue,
+                    upcomingEvents = result.UpcomingEvents
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar summary analytics.");
+                return StatusCode(500, new { error = "Erro interno ao obter o resumo." });
+            }
         }
 
-        // Gráfico de fluxo de caixa mensal (receitas vs despesas por mês)
-        [HttpGet("cashflow")]
-        [Authorize]
-        public async Task<IActionResult> GetCashFlow([FromQuery] int months = 6)
-        {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
-
-            var sql = @"
-                SELECT 
-                    DATE_FORMAT(transaction_date, '%Y-%m') as month,
-                    SUM(CASE WHEN type = 'receita' THEN amount ELSE 0 END) as revenue,
-                    SUM(CASE WHEN type = 'despesa' THEN amount ELSE 0 END) as expenses
-                FROM transactions
-                WHERE user_id = @UserId 
-                AND transaction_date >= DATE_SUB(NOW(), INTERVAL @Months MONTH)
-                GROUP BY DATE_FORMAT(transaction_date, '%Y-%m')
-                ORDER BY month ASC
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId, Months = months });
-            return Ok(data);
-        }
-
-        // Distribuição de despesas por categoria (gráfico de pizza)
+        // ========================================================================
+        // 2. DESPESAS POR CATEGORIA
+        // ========================================================================
         [HttpGet("expenses-by-category")]
         [Authorize]
-        public async Task<IActionResult> GetExpensesByCategory([FromQuery] string? period = "month")
+        public async Task<IActionResult> GetExpensesByCategory()
         {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
-
-            var dateFilter = period switch
+            try
             {
-                "week" => "DATE_SUB(NOW(), INTERVAL 7 DAY)",
-                "month" => "DATE_SUB(NOW(), INTERVAL 30 DAY)",
-                "year" => "DATE_SUB(NOW(), INTERVAL 365 DAY)",
-                _ => "DATE_SUB(NOW(), INTERVAL 30 DAY)"
-            };
+                var sql = @"
+                    SELECT category, SUM(amount) AS total
+                    FROM transactions
+                    WHERE type = 'expense'
+                    GROUP BY category
+                    ORDER BY total DESC;
+                ";
 
-            var sql = $@"
-                SELECT 
-                    category,
-                    SUM(amount) as total,
-                    COUNT(*) as count
-                FROM transactions
-                WHERE user_id = @UserId 
-                AND type = 'despesa'
-                AND transaction_date >= {dateFilter}
-                GROUP BY category
-                ORDER BY total DESC
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId });
-            return Ok(data);
+                var result = await _db.QueryAsync(sql);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar expenses-by-category.");
+                return StatusCode(500, new { error = "Erro ao carregar despesas por categoria." });
+            }
         }
 
-        // Distribuição de receitas por categoria
+        // ========================================================================
+        // 3. RECEITAS POR CATEGORIA
+        // ========================================================================
         [HttpGet("revenue-by-category")]
         [Authorize]
-        public async Task<IActionResult> GetRevenueByCategory([FromQuery] string? period = "month")
+        public async Task<IActionResult> GetRevenueByCategory()
         {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
-
-            var dateFilter = period switch
+            try
             {
-                "week" => "DATE_SUB(NOW(), INTERVAL 7 DAY)",
-                "month" => "DATE_SUB(NOW(), INTERVAL 30 DAY)",
-                "year" => "DATE_SUB(NOW(), INTERVAL 365 DAY)",
-                _ => "DATE_SUB(NOW(), INTERVAL 30 DAY)"
-            };
+                var sql = @"
+                    SELECT category, SUM(amount) AS total
+                    FROM transactions
+                    WHERE type = 'income'
+                    GROUP BY category
+                    ORDER BY total DESC;
+                ";
 
-            var sql = $@"
-                SELECT 
-                    category,
-                    SUM(amount) as total,
-                    COUNT(*) as count
-                FROM transactions
-                WHERE user_id = @UserId 
-                AND type = 'receita'
-                AND transaction_date >= {dateFilter}
-                GROUP BY category
-                ORDER BY total DESC
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId });
-            return Ok(data);
+                var result = await _db.QueryAsync(sql);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar revenue-by-category.");
+                return StatusCode(500, new { error = "Erro ao carregar receitas por categoria." });
+            }
         }
 
-        // Top clientes (por valor de transações)
-        [HttpGet("top-clients")]
+        // ========================================================================
+        // 4. CATEGORIAS (DE TRANSACÕES)
+        // ========================================================================
+        [HttpGet("categories")]
         [Authorize]
-        public async Task<IActionResult> GetTopClients([FromQuery] int limit = 10)
+        public async Task<IActionResult> GetCategories()
         {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+            try
+            {
+                var sql = @"
+                    SELECT DISTINCT category 
+                    FROM transactions
+                    WHERE category IS NOT NULL
+                    ORDER BY category;
+                ";
 
-            var sql = @"
-                SELECT 
-                    c.id,
-                    c.name,
-                    COALESCE(SUM(t.amount), 0) as totalRevenue,
-                    COUNT(t.id) as transactionCount
-                FROM clients c
-                LEFT JOIN transactions t ON t.client_id = c.id AND t.type = 'receita'
-                WHERE c.owner_user_id = @UserId
-                GROUP BY c.id, c.name
-                ORDER BY totalRevenue DESC
-                LIMIT @Limit
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId, Limit = limit });
-            return Ok(data);
+                var result = await _db.QueryAsync<string>(sql);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao listar categorias.");
+                return StatusCode(500, new { error = "Erro ao listar categorias." });
+            }
         }
 
-        // Produtos/serviços mais lucrativos
-        [HttpGet("profitable-items")]
-        [Authorize]
-        public async Task<IActionResult> GetProfitableItems([FromQuery] int limit = 10)
-        {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
-
-            var sql = @"
-                SELECT 
-                    name,
-                    category,
-                    quantity,
-                    cost_price,
-                    selling_price,
-                    (selling_price - cost_price) as profit_per_unit,
-                    (selling_price - cost_price) * quantity as total_potential_profit
-                FROM inventory_items
-                WHERE owner_user_id = @UserId
-                AND quantity > 0
-                ORDER BY total_potential_profit DESC
-                LIMIT @Limit
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId, Limit = limit });
-            return Ok(data);
-        }
-
-        // Tendências de crescimento (comparação mês atual vs mês anterior)
+        // ========================================================================
+        // 5. GRÁFICO — TENDÊNCIAS MENSAIS
+        // ========================================================================
         [HttpGet("growth-trends")]
         [Authorize]
         public async Task<IActionResult> GetGrowthTrends()
         {
-            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+            try
+            {
+                var sql = @"
+                    SELECT 
+                        DATE_FORMAT(date, '%Y-%m') AS month,
+                        SUM(CASE WHEN type = 'income' THEN amount END) AS revenue,
+                        SUM(CASE WHEN type = 'expense' THEN amount END) AS expenses
+                    FROM transactions
+                    GROUP BY month
+                    ORDER BY month ASC;
+                ";
 
-            var sql = @"
-                SELECT 
-                    'revenue' as metric,
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'receita' AND MONTH(transaction_date) = MONTH(NOW()) AND YEAR(transaction_date) = YEAR(NOW())) as current_month,
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'receita' AND MONTH(transaction_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(transaction_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))) as previous_month
-                UNION ALL
-                SELECT 
-                    'expenses' as metric,
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'despesa' AND MONTH(transaction_date) = MONTH(NOW()) AND YEAR(transaction_date) = YEAR(NOW())) as current_month,
-                    (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = @UserId AND type = 'despesa' AND MONTH(transaction_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(transaction_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))) as previous_month
-                UNION ALL
-                SELECT 
-                    'profit' as metric,
-                    (SELECT COALESCE(SUM(CASE WHEN type = 'receita' THEN amount ELSE -amount END), 0) FROM transactions WHERE user_id = @UserId AND MONTH(transaction_date) = MONTH(NOW()) AND YEAR(transaction_date) = YEAR(NOW())) as current_month,
-                    (SELECT COALESCE(SUM(CASE WHEN type = 'receita' THEN amount ELSE -amount END), 0) FROM transactions WHERE user_id = @UserId AND MONTH(transaction_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(transaction_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))) as previous_month
-            ";
-
-            var data = await _db.QueryAsync(sql, new { UserId = userId });
-            return Ok(data);
+                var result = await _db.QueryAsync(sql);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar crescimento mensal.");
+                return StatusCode(500, new { error = "Erro ao gerar tendências de crescimento." });
+            }
         }
     }
 }

@@ -1,6 +1,10 @@
-using System.Net;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using MySql.Data.MySqlClient;
+using System;
+using System.Net;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace TrampayBackend.Middleware
 {
@@ -8,30 +12,72 @@ namespace TrampayBackend.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ErrorHandlerMiddleware> _logger;
+
         public ErrorHandlerMiddleware(RequestDelegate next, ILogger<ErrorHandlerMiddleware> logger)
         {
-            _next = next; _logger = logger;
+            _next = next;
+            _logger = logger;
         }
 
-        public async Task Invoke(HttpContext ctx)
+        public async Task Invoke(HttpContext context)
         {
             try
             {
-                await _next(ctx);
+                await _next(context);
+            }
+            catch (MySqlException sqlEx)
+            {
+                // Erros específicos de banco de dados
+                _logger.LogError(sqlEx, "[MySQL ERROR] Erro de banco de dados capturado.");
+
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    error = "Erro de banco de dados.",
+                    detail = sqlEx.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Erros de autenticação/autorização
+                _logger.LogWarning(ex, "[AUTH ERROR] Acesso não autorizado.");
+
+                context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    error = "Você não tem permissão para acessar este recurso.",
+                    detail = ex.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled exception");
-                ctx.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                ctx.Response.ContentType = "application/json";
-                var result = JsonSerializer.Serialize(new { error = "internal_error", message = ex.Message });
-                await ctx.Response.WriteAsync(result);
+                // Qualquer outro erro inesperado
+                _logger.LogError(ex, "[SERVER ERROR] Erro não tratado.");
+
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    error = "Ocorreu um erro inesperado.",
+                    detail = ex.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
             }
         }
     }
 
-    // extension
-    public static class ErrorHandlerExtensions
+    // Extensão opcional para facilitar Program.cs
+    public static class ErrorHandlerExtension
     {
         public static IApplicationBuilder UseErrorHandler(this IApplicationBuilder app)
         {
