@@ -36,20 +36,57 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
   const maxValue = Math.max(...normalizedData.map(d => d.displayValue));
   
   // Calcula a largura das barras garantindo que todas caibam no gráfico
+  // Estratégia: garantir que dataLength * barWidth + (dataLength + 1) * barSpacing <= chartWidth
   const dataLength = normalizedData.length;
-  const barSpacing = 10;
-  const minBarWidth = 20;
+  const preferredSpacing = 10;
   const maxBarWidth = 80;
   
-  // Espaço total disponível para barras = chartWidth - espaços entre barras
-  const totalSpacing = barSpacing * (dataLength + 1);
-  const availableWidth = chartWidth - totalSpacing;
+  let barSpacing;
+  let barWidth;
   
-  // Largura de cada barra = espaço disponível dividido pelo número de barras
-  let barWidth = availableWidth / dataLength;
+  // Calcula o spacing adaptativo baseado no espaço disponível
+  // Se o spacing preferido cabe, usa ele. Senão, reduz proporcionalmente.
+  const minSpacingNeeded = (dataLength + 1) * preferredSpacing;
   
-  // Limita a largura entre min e max
-  barWidth = Math.max(minBarWidth, Math.min(maxBarWidth, barWidth));
+  if (minSpacingNeeded < chartWidth * 0.3) {
+    // Há espaço suficiente para o spacing preferido
+    barSpacing = preferredSpacing;
+  } else if (dataLength < 10) {
+    // Poucos dados, usa spacing menor
+    barSpacing = Math.max(5, Math.floor(chartWidth / (dataLength * 8)));
+  } else {
+    // Muitos dados, spacing mínimo
+    barSpacing = Math.max(1, Math.floor(chartWidth / (dataLength * 15)));
+  }
+  
+  // Calcula barWidth garantindo que cabe no espaço disponível
+  let totalSpacingWidth = (dataLength + 1) * barSpacing;
+  let availableForBars = chartWidth - totalSpacingWidth;
+  
+  if (availableForBars > 0) {
+    barWidth = availableForBars / dataLength;
+    
+    // Se a barra ficar muito pequena (<3px), reduz spacing e recalcula
+    if (barWidth < 3 && barSpacing > 0) {
+      barSpacing = Math.max(0, Math.floor((chartWidth - dataLength * 3) / (dataLength + 1)));
+      totalSpacingWidth = (dataLength + 1) * barSpacing;
+      availableForBars = chartWidth - totalSpacingWidth;
+      barWidth = availableForBars / dataLength;
+    }
+    
+    barWidth = Math.min(maxBarWidth, barWidth);
+  } else {
+    // Caso extremo: sem espaço para spacing, usa spacing 0
+    barSpacing = 0;
+    barWidth = chartWidth / dataLength;
+  }
+  
+  // Garantia final: NUNCA ultrapassar chartWidth
+  const finalTotalWidth = dataLength * barWidth + (dataLength + 1) * barSpacing;
+  if (finalTotalWidth > chartWidth) {
+    barSpacing = 0;
+    barWidth = chartWidth / dataLength;
+  }
 
   // Formata valores em reais
   const formatCurrency = (value) => {
