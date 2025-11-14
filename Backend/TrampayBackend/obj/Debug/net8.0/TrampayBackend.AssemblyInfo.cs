@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TrampayBackend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dd01cfde1999f79155634c372d90353af9c56aaa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("TrampayBackend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TrampayBackend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
