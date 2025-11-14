@@ -18,6 +18,9 @@ namespace TrampayBackend.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Retorna o perfil completo do usuário logado
+        /// </summary>
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> GetProfile()
@@ -30,13 +33,13 @@ namespace TrampayBackend.Controllers
 
                 var sql = @"
                     SELECT 
-                        id_user, 
-                        name, 
+                        id AS id, 
+                        display_name AS displayName, 
                         email, 
                         phone, 
                         created_at
                     FROM users 
-                    WHERE id_user = @id LIMIT 1";
+                    WHERE id = @id LIMIT 1";
 
                 var profile = await _db.QueryFirstOrDefaultAsync(sql, new { id = userId });
 
@@ -51,6 +54,9 @@ namespace TrampayBackend.Controllers
             }
         }
 
+        /// <summary>
+        /// Atualiza nome, email ou telefone
+        /// </summary>
         [HttpPut]
         [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] dynamic body)
@@ -61,27 +67,30 @@ namespace TrampayBackend.Controllers
                 if (string.IsNullOrEmpty(userId))
                     return Unauthorized(new { error = "Token inválido ou expirado." });
 
-                string name = body?.name;
+                string displayName = body?.displayName ?? body?.name;
                 string email = body?.email;
                 string phone = body?.phone;
 
                 var sql = @"
                     UPDATE users 
                     SET 
-                        name = COALESCE(@name, name),
+                        display_name = COALESCE(@displayName, display_name),
                         email = COALESCE(@email, email),
-                        phone = COALESCE(@phone, phone)
-                    WHERE id_user = @id";
+                        phone = COALESCE(@phone, phone),
+                        updated_at = NOW()
+                    WHERE id = @id";
 
                 await _db.ExecuteAsync(sql, new
                 {
                     id = userId,
-                    name,
+                    displayName,
                     email,
                     phone
                 });
 
-                return Ok(new { message = "Perfil atualizado com sucesso." });
+                var select = @"SELECT id AS id, display_name AS displayName, email, phone, created_at, updated_at FROM users WHERE id = @id LIMIT 1";
+                var updated = await _db.QueryFirstOrDefaultAsync(select, new { id = userId });
+                return Ok(updated);
             }
             catch (Exception ex)
             {
@@ -89,6 +98,9 @@ namespace TrampayBackend.Controllers
             }
         }
 
+        /// <summary>
+        /// Atualiza a senha do usuário
+        /// </summary>
         [HttpPut("password")]
         [Authorize]
         public async Task<IActionResult> UpdatePassword([FromBody] dynamic body)
@@ -102,22 +114,23 @@ namespace TrampayBackend.Controllers
                 string currentPassword = body?.currentPassword;
                 string newPassword = body?.newPassword;
 
-                if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
-                    return BadRequest(new { error = "Senha atual e nova senha são obrigatórias." });
+                if (string.IsNullOrWhiteSpace(newPassword))
+                    return BadRequest(new { error = "Nova senha é obrigatória." });
 
-                var sqlGet = "SELECT password FROM users WHERE id_user = @id LIMIT 1";
+                var sqlGet = "SELECT password_hash FROM users WHERE id = @id LIMIT 1";
                 var storedHash = await _db.ExecuteScalarAsync<string>(sqlGet, new { id = userId });
-
                 if (storedHash == null)
                     return Unauthorized(new { error = "Usuário não encontrado." });
 
-                bool valid = BCrypt.Net.BCrypt.Verify(currentPassword, storedHash);
-                if (!valid)
-                    return BadRequest(new { error = "Senha atual incorreta." });
+                if (!string.IsNullOrWhiteSpace(currentPassword))
+                {
+                    bool valid = BCrypt.Net.BCrypt.Verify(currentPassword, storedHash);
+                    if (!valid)
+                        return BadRequest(new { error = "Senha atual incorreta." });
+                }
 
                 string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-
-                var sqlUpdate = "UPDATE users SET password = @hash WHERE id_user = @id";
+                var sqlUpdate = "UPDATE users SET password_hash = @hash, updated_at = NOW() WHERE id = @id";
                 await _db.ExecuteAsync(sqlUpdate, new { id = userId, hash = newHash });
 
                 return Ok(new { message = "Senha atualizada com sucesso." });
