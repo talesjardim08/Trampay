@@ -80,10 +80,10 @@ const PaymentConfirmationModal = ({ visible, onClose, service, onComplete }) => 
             
             <View style={styles.timeContainer}>
               <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Data: {service.date.split('-').reverse().join('/')}</Text>
+                <Text style={styles.timeLabel}>Data: {typeof service.date === 'string' ? service.date.split('-').reverse().join('/') : '—'}</Text>
               </View>
               <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Horário: {service.time}</Text>
+                <Text style={styles.timeLabel}>Horário: {service.time || '—'}</Text>
               </View>
             </View>
 
@@ -102,10 +102,10 @@ const PaymentConfirmationModal = ({ visible, onClose, service, onComplete }) => 
             
             <View style={styles.timeContainer}>
               <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Data: {service.date.split('-').reverse().join('/')}</Text>
+                <Text style={styles.timeLabel}>Data: {typeof service.date === 'string' ? service.date.split('-').reverse().join('/') : '—'}</Text>
               </View>
               <View style={styles.timeItem}>
-                <Text style={styles.timeLabel}>Horário: {service.time}</Text>
+                <Text style={styles.timeLabel}>Horário: {service.time || '—'}</Text>
               </View>
             </View>
 

@@ -72,5 +72,32 @@ namespace TrampayBackend.Controllers
 
             return Ok(new { isPremium, premiumUntil });
         }
+
+        // POST api/subscription/deactivate
+        // Permite ao usuário desativar o PRO a qualquer momento
+        [Authorize]
+        [HttpPost("deactivate")]
+        public async Task<IActionResult> Deactivate()
+        {
+            var userIdClaim = User.FindFirst("id")?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Unauthorized();
+
+            if (!long.TryParse(userIdClaim, out var userId))
+                return Unauthorized();
+
+            var sql = @"UPDATE users 
+                        SET is_premium = 0, premium_until = NULL 
+                        WHERE id = @userId";
+
+            var affected = await _db.ExecuteAsync(sql, new { userId });
+
+            if (affected > 0)
+            {
+                return Ok(new { success = true });
+            }
+
+            return BadRequest(new { success = false, message = "Não foi possível desativar a assinatura." });
+        }
     }
 }

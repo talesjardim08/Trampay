@@ -5,7 +5,7 @@ import api from '../services/api';
 import { colors, fonts, spacing } from '../styles';
 
 const AssineProScreen = ({ navigation }) => {
-  const { activatePro, isPro, loading: authLoading } = useContext(AuthContext);
+  const { activatePro, deactivatePro, isPro, loading: authLoading } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ isPremium: false, premiumUntil: null });
 
@@ -34,9 +34,14 @@ const AssineProScreen = ({ navigation }) => {
         {status.premiumUntil && (
           <Text style={styles.until}>Válida até: {new Date(status.premiumUntil).toLocaleDateString()}</Text>
         )}
-        <TouchableOpacity style={styles.secondary} onPress={() => navigation.goBack()}>
-          <Text style={styles.secondaryText}>Voltar</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+          <TouchableOpacity style={styles.secondary} onPress={() => navigation.goBack()}>
+            <Text style={styles.secondaryText}>Voltar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deactivate} onPress={deactivatePro}>
+            <Text style={styles.deactivateText}>Desativar PRO</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -77,5 +82,7 @@ const styles = StyleSheet.create({
   ctaText: { color: colors.white, fontSize: 18, fontFamily: fonts.bold },
   secondary: { marginTop: spacing.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: 12, borderWidth: 1, borderColor: colors.lightGray },
   secondaryText: { color: colors.text, fontSize: 16, fontFamily: fonts.medium },
-  until: { marginTop: spacing.md, color: colors.text }
+  until: { marginTop: spacing.md, color: colors.text },
+  deactivate: { marginTop: spacing.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: 12, backgroundColor: colors.error },
+  deactivateText: { color: colors.white, fontSize: 16, fontFamily: fonts.bold }
 });

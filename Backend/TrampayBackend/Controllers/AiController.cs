@@ -195,47 +195,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        [Authorize]
-        [HttpPost("image")]
-        public async Task<IActionResult> PostImage([FromForm] ImageAnalyzeRequest request)
-        {
-            try
-            {
-                var userIdClaim = User.FindFirst("id")?.Value;
-                if (!long.TryParse(userIdClaim, out var userId)) 
-                    return Unauthorized(new { error = "Token inválido" });
-
-                // Verificar se usuário é premium
-                var isPremium = await _db.QueryFirstOrDefaultAsync<bool?>(
-                    "SELECT is_premium FROM users WHERE id = @userId AND (premium_until IS NULL OR premium_until > NOW()) LIMIT 1",
-                    new { userId });
-
-                if (isPremium != true)
-                    return Forbid();
-
-                if (request.File == null || request.File.Length == 0)
-                    return BadRequest(new { message = "Arquivo não enviado" });
-
-                // Call AiService OCR
-                var ocrResult = await _aiService.AnalyzeImageAsync(request.File);
-
-                // Save OCR result as a chat
-                var insertChatSql = "INSERT INTO ai_chats (user_id, title) VALUES (@userId, @title); SELECT LAST_INSERT_ID();";
-                var chatId = await _db.ExecuteScalarAsync<long>(insertChatSql, new { userId, title = "OCR - " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm") });
-
-                var insertMsgSql = @"INSERT INTO ai_messages (chat_id, user_id, role, content, metadata) 
-                                     VALUES (@chatId, @userId, @role, @content, @metadata)";
-                await _db.ExecuteAsync(insertMsgSql, new { chatId, userId, role = "user", content = "[Imagem enviada para OCR]", metadata = (string?)null });
-                await _db.ExecuteAsync(insertMsgSql, new { chatId, userId = (long?)null, role = "assistant", content = ocrResult, metadata = (string?)null });
-
-                return Ok(new { chatId, ocr = ocrResult });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[AI/IMAGE ERROR] {ex.Message}");
-                return Problem(detail: ex.Message, title: "Erro ao processar imagem");
-            }
-        }
     }
 
     // Request DTOs
@@ -246,8 +205,5 @@ namespace TrampayBackend.Controllers
         public string Message { get; set; } = null!;
     }
 
-    public class ImageAnalyzeRequest
-    {
-        public Microsoft.AspNetCore.Http.IFormFile? File { get; set; }
-    }
+    
 }

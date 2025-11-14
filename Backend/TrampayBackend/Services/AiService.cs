@@ -24,7 +24,7 @@ namespace TrampayBackend.Services
         public async Task<string> GetChatResponseAsync(string input)
         {
             var hfUrl = _config["Ai:HuggingFaceApiUrl"];
-            var hfKey = _config["Ai:HuggingFaceApiKey"];
+            var hfKey = _config["Ai:HuggingFaceApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY");
 
             if (string.IsNullOrEmpty(hfUrl) || string.IsNullOrEmpty(hfKey))
             {

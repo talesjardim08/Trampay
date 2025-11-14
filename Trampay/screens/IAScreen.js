@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, TextInput, ScrollView, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, FlatList } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { colors, fonts, spacing, borderRadius } from "../styles";
 import api from "../services/api";
 import { AuthContext } from "../AuthContext";
 
@@ -10,7 +10,6 @@ export default function IAScreen({ navigation }) {
   const [messages, setMessages] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingImage, setLoadingImage] = useState(false);
   const [chats, setChats] = useState([]);
   const [showChats, setShowChats] = useState(false);
 
@@ -85,55 +84,6 @@ export default function IAScreen({ navigation }) {
     }
   };
 
-  const uploadImage = async () => {
-    if (!isPro) {
-      Alert.alert("Erro", "Apenas usuários PRO podem usar OCR.");
-      return;
-    }
-
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert("Permissão Negada", "Você precisa permitir o acesso às fotos.");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setLoadingImage(true);
-        
-        const formData = new FormData();
-        formData.append("file", {
-          uri: result.assets[0].uri,
-          name: "image.jpg",
-          type: "image/jpeg",
-        });
-
-        const res = await api.post("/ai/image", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        setMessages((prev) => [
-          ...prev,
-          { role: "user", content: "[Imagem enviada para OCR]" },
-          { role: "assistant", content: res.data.ocr || "Texto extraído da imagem." },
-        ]);
-
-        if (res.data.chatId) {
-          setCurrentChatId(res.data.chatId);
-        }
-      }
-    } catch (e) {
-      Alert.alert("Erro", "Não foi possível processar a imagem.");
-    } finally {
-      setLoadingImage(false);
-    }
-  };
 
   const newChat = () => {
     setCurrentChatId(null);
@@ -215,7 +165,7 @@ export default function IAScreen({ navigation }) {
         ))}
         {loading && (
           <View style={styles.aiBubble}>
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={colors.primary} />
           </View>
         )}
       </ScrollView>
@@ -227,102 +177,45 @@ export default function IAScreen({ navigation }) {
           placeholder="Digite sua mensagem..."
           style={styles.input}
           multiline
-          editable={!loading && !loadingImage}
+          editable={!loading}
         />
         <TouchableOpacity
           style={styles.sendButton}
           onPress={sendMessage}
-          disabled={loading || loadingImage || !message.trim()}
+          disabled={loading || !message.trim()}
         >
           <Text style={styles.sendButtonText}>Enviar</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.uploadButton} onPress={uploadImage} disabled={loadingImage || loading}>
-        <Text style={styles.uploadButtonText}>{loadingImage ? "Processando..." : "Analisar Imagem (OCR)"}</Text>
-      </TouchableOpacity>
+      {null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  headerActions: { flexDirection: "row", gap: 8 },
-  headerButton: { backgroundColor: "#007AFF", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
-  headerButtonText: { color: "#fff" },
-  chatsPanel: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
-  chatItemRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md, backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
+  title: { fontSize: 20, fontFamily: fonts.bold, color: colors.text },
+  headerActions: { flexDirection: "row", gap: spacing.sm },
+  headerButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md },
+  headerButtonText: { color: colors.white, fontFamily: fonts.medium },
+  chatsPanel: { backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
+  chatItemRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   chatItem: { flex: 1 },
-  chatTitle: { fontSize: 16, fontWeight: "600" },
-  chatMeta: { fontSize: 12, color: "#666" },
-  chatDelete: { marginLeft: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#eee", borderRadius: 8 },
-  chatDeleteText: { color: "#d00" },
-  chatContainer: {
-    flex: 1,
-    padding: 10,
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 15,
-    marginVertical: 5,
-    maxWidth: "80%",
-  },
-  userBubble: {
-    backgroundColor: "#007AFF",
-    alignSelf: "flex-end",
-  },
-  aiBubble: {
-    backgroundColor: "#e5e5ea",
-    alignSelf: "flex-start",
-  },
-  messageText: {
-    fontSize: 16,
-    color: "#000",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    padding: 10,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    justifyContent: "center",
-  },
-  sendButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
+  chatTitle: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+  chatMeta: { fontSize: 12, color: colors.textLight },
+  chatDelete: { marginLeft: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, backgroundColor: colors.lightGray, borderRadius: borderRadius.sm },
+  chatDeleteText: { color: colors.error, fontFamily: fonts.medium },
+  chatContainer: { flex: 1, padding: spacing.sm },
+  messageBubble: { padding: spacing.md, borderRadius: borderRadius.lg, marginVertical: spacing.xs, maxWidth: "80%" },
+  userBubble: { backgroundColor: colors.primaryDark, alignSelf: "flex-end" },
+  aiBubble: { backgroundColor: colors.lightGray, alignSelf: "flex-start" },
+  messageText: { fontSize: 16, fontFamily: fonts.regular, color: colors.text },
+  inputContainer: { flexDirection: "row", padding: spacing.sm, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
+  input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginRight: spacing.sm, maxHeight: 100 },
+  sendButton: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, justifyContent: "center" },
+  sendButtonText: { color: colors.white, fontFamily: fonts.bold },
   uploadButton: {
     backgroundColor: "#34C759",
     padding: 15,

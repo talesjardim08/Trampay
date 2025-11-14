@@ -4,6 +4,7 @@
 // sincronização com AsyncStorage/AsyncStorage, tratamento de erros e logs detalhados.
 
 import React, { useState, useEffect, useContext } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -33,7 +34,7 @@ import { AuthContext } from './AuthContext';
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation, route }) => {
-  const { user: contextUser, isPro } = useContext(AuthContext);
+  const { user: contextUser, isPro, setUser } = useContext(AuthContext);
   const currentUser = contextUser || route?.params?.user;
 
   // Estados para filtros e dados
@@ -173,6 +174,21 @@ const HomeScreen = ({ navigation, route }) => {
       return null;
     }
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        const profile = await fetchProfileFromServer();
+        if (profile && active) {
+          setUser(profile);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   // --- Fetch transactions from backend
   const fetchTransactionsFromServer = async (params = {}) => {

@@ -107,6 +107,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const deactivatePro = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("❌ Erro", "Você precisa estar logado para desativar o PRO.");
+        return;
+      }
+
+      const response = await api.post('/subscription/deactivate');
+      if (response.data.success) {
+        const profile = await getUserProfile();
+        if (profile) {
+          setUser(profile);
+          setIsPro(Boolean(profile.isPro));
+        } else {
+          setIsPro(false);
+        }
+        Alert.alert("ℹ️ Assinatura PRO desativada.");
+      }
+    } catch (error) {
+      console.error("Erro ao desativar PRO:", error);
+      Alert.alert("❌ Erro", "Não foi possível desativar a assinatura PRO.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     setUser,
@@ -116,6 +144,7 @@ export const AuthProvider = ({ children }) => {
     handleLogout,
     handleRegister,
     activatePro,
+    deactivatePro,
   };
 
   return (

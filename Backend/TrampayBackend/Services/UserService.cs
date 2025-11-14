@@ -16,7 +16,7 @@ public class UserService : IUserService
     public UserService(IConfiguration config)
     {
         _config = config;
-        _connStr = _config.GetConnectionString("Default") ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default")!;
+        _connStr = _config.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")!;
     }
 
     private IDbConnection GetConnection() => new MySqlConnection(_connStr);

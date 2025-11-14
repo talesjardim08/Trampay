@@ -287,7 +287,7 @@ const ServicesScreen = ({ navigation }) => {
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryDark} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Serviços</Text>
+        <Text style={styles.headerTitle}>Meus Serviços</Text>
         
         <View style={styles.headerSpacer} />
       </View>
@@ -496,7 +496,7 @@ const ServicesScreen = ({ navigation }) => {
                         <Text style={styles.templateDescription}>{template.description}</Text>
                       </View>
                       <View style={styles.templateActions}>
-                        <Text style={styles.templatePrice}>R$ {template.defaultPrice.toFixed(2)}</Text>
+                        <Text style={styles.templatePrice}>R$ {Number(template.defaultPrice ?? 0).toFixed(2)}</Text>
                         <TouchableOpacity
                           style={styles.viewDetailsButton}
                           onPress={() => handleViewTemplateDetails(template)}
@@ -634,7 +634,7 @@ const ServicesScreen = ({ navigation }) => {
                 <Text style={styles.detailSectionTitle}>Preço e Tempo</Text>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Preço Padrão:</Text>
-                  <Text style={styles.detailValuePrice}>R$ {selectedTemplate.defaultPrice.toFixed(2)}</Text>
+                  <Text style={styles.detailValuePrice}>R$ {Number(selectedTemplate?.defaultPrice ?? 0).toFixed(2)}</Text>
                 </View>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Duração Estimada:</Text>
