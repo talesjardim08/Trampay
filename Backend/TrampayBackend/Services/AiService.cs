@@ -68,139 +68,53 @@ namespace TrampayBackend.Services
 
         public async Task<string> GetChatResponseAsync(string input)
         {
-            var hfKey = _config["Ai:HuggingFaceApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY");
-            if (string.IsNullOrEmpty(hfKey))
+            var geminiKey = _config["Ai:GeminiApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+            if (string.IsNullOrEmpty(geminiKey))
             {
                 return $"[Resposta automática] Recebi: {input}";
             }
 
-            var url = "https://router.huggingface.co/v1/chat/completions";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
             var payload = new
             {
-                model = "mistralai/Mistral-7B-Instruct", // continue usando, mas trate erros abaixo
-                messages = new[] { new { role = "user", content = input } },
-                temperature = 0.2
+                contents = new[]
+                {
+                    new
+                    {
+                        parts = new[] { new { text = input } }
+                    }
+                }
             };
             var json = JsonSerializer.Serialize(payload);
 
             try
             {
-                var (success, body, contentType) = await PostJsonAsync(url, json, hfKey);
+                using var req = new HttpRequestMessage(HttpMethod.Post, url);
+                req.Headers.Accept.Clear();
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                if (!success)
+                var res = await _http.SendAsync(req);
+                var body = await res.Content.ReadAsStringAsync();
+                var contentType = res.Content.Headers.ContentType?.MediaType ?? "";
+
+                if (!res.IsSuccessStatusCode)
                 {
-                    // If HTML returned, strip tags and provide helpful message
                     if (contentType.Contains("html") || body.TrimStart().StartsWith("<"))
                     {
                         var text = StripHtml(body);
                         return $"[Erro no modelo] Resposta HTML do provedor: {text}";
                     }
 
-                    // try parse json error
                     try
                     {
                         using var docErr = JsonDocument.Parse(body);
                         if (docErr.RootElement.TryGetProperty("error", out var errProp))
                         {
-                            return $"[Erro no modelo] {errProp.GetString()}";
-                        }
-                    }
-                    catch { /* ignore parse errors */ }
-
-                    return $"[Erro no modelo] Status não OK. Conteúdo: {body}";
-                }
-
-                // success path: parse response
-                try
-                {
-                    using var doc = JsonDocument.Parse(body);
-                    // Attempt to support multiple shapes returned by different HF endpoints
-                    if (doc.RootElement.TryGetProperty("choices", out var choices) &&
-                        choices.ValueKind == JsonValueKind.Array &&
-                        choices.GetArrayLength() > 0)
-                    {
-                        var first = choices[0];
-                        if (first.TryGetProperty("message", out var messageProp))
-                        {
-                            if (messageProp.TryGetProperty("content", out var contentProp))
+                            if (errProp.TryGetProperty("message", out var msgProp))
                             {
-                                return contentProp.GetString() ?? body;
+                                return $"[Erro no modelo] {msgProp.GetString()}";
                             }
-                        }
-                        // fallback to "text" or "delta" style
-                        if (first.TryGetProperty("text", out var textProp))
-                        {
-                            return textProp.GetString() ?? body;
-                        }
-                    }
-
-                    // Some routers return top-level "result" or "output"
-                    if (doc.RootElement.TryGetProperty("result", out var resProp))
-                    {
-                        return resProp.ToString();
-                    }
-
-                    // If nothing matched, return raw body
-                    return body;
-                }
-                catch (Exception ex)
-                {
-                    // If parsing fails but body is HTML, strip tags
-                    if (body.TrimStart().StartsWith("<"))
-                    {
-                        var text = StripHtml(body);
-                        return $"[Erro] Resposta do provedor (HTML): {text}";
-                    }
-                    // fallback
-                    return $"[Erro] Não foi possível interpretar a resposta do modelo. Conteúdo: {body}";
-                }
-            }
-            catch (Exception ex)
-            {
-                // network or unexpected
-                return $"[Erro interno] {ex.Message}";
-            }
-        }
-
-        public async Task<string> GetChatResponseAsync(IList<ChatMessage> messages)
-        {
-            var hfKey = _config["Ai:HuggingFaceApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY");
-            if (string.IsNullOrEmpty(hfKey))
-            {
-                if (messages != null && messages.Count > 0)
-                {
-                    var last = messages[messages.Count - 1].content;
-                    return $"[Resposta automática] Recebi: {last}";
-                }
-                return "[Resposta automática]";
-            }
-
-            var url = "https://router.huggingface.co/v1/chat/completions";
-            var payload = new
-            {
-                model = "mistralai/Mistral-7B-Instruct",
-                messages = messages,
-                temperature = 0.2
-            };
-            var json = JsonSerializer.Serialize(payload);
-
-            try
-            {
-                var (success, body, contentType) = await PostJsonAsync(url, json, hfKey);
-
-                if (!success)
-                {
-                    if (contentType.Contains("html") || body.TrimStart().StartsWith("<"))
-                    {
-                        var text = StripHtml(body);
-                        return $"[Erro no modelo] Resposta HTML do provedor: {text}";
-                    }
-
-                    try
-                    {
-                        using var docErr = JsonDocument.Parse(body);
-                        if (docErr.RootElement.TryGetProperty("error", out var errProp))
-                        {
                             return $"[Erro no modelo] {errProp.GetString()}";
                         }
                     }
@@ -212,30 +126,133 @@ namespace TrampayBackend.Services
                 try
                 {
                     using var doc = JsonDocument.Parse(body);
-                    if (doc.RootElement.TryGetProperty("choices", out var choices) &&
-                        choices.ValueKind == JsonValueKind.Array &&
-                        choices.GetArrayLength() > 0)
+                    if (doc.RootElement.TryGetProperty("candidates", out var candidates) &&
+                        candidates.ValueKind == JsonValueKind.Array &&
+                        candidates.GetArrayLength() > 0)
                     {
-                        var first = choices[0];
-                        if (first.TryGetProperty("message", out var messageProp))
+                        var first = candidates[0];
+                        if (first.TryGetProperty("content", out var content))
                         {
-                            if (messageProp.TryGetProperty("content", out var contentProp))
+                            if (content.TryGetProperty("parts", out var parts) &&
+                                parts.ValueKind == JsonValueKind.Array &&
+                                parts.GetArrayLength() > 0)
                             {
-                                return contentProp.GetString() ?? body;
+                                var firstPart = parts[0];
+                                if (firstPart.TryGetProperty("text", out var textProp))
+                                {
+                                    return textProp.GetString() ?? "[Sem resposta]";
+                                }
                             }
                         }
-                        if (first.TryGetProperty("text", out var textProp))
+                    }
+
+                    return $"[Erro] Formato de resposta inesperado: {body}";
+                }
+                catch (Exception ex)
+                {
+                    if (body.TrimStart().StartsWith("<"))
+                    {
+                        var text = StripHtml(body);
+                        return $"[Erro] Resposta do provedor (HTML): {text}";
+                    }
+                    return $"[Erro] Não foi possível interpretar a resposta do modelo. Conteúdo: {body}";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"[Erro interno] {ex.Message}";
+            }
+        }
+
+        public async Task<string> GetChatResponseAsync(IList<ChatMessage> messages)
+        {
+            var geminiKey = _config["Ai:GeminiApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+            if (string.IsNullOrEmpty(geminiKey))
+            {
+                if (messages != null && messages.Count > 0)
+                {
+                    var last = messages[messages.Count - 1].content;
+                    return $"[Resposta automática] Recebi: {last}";
+                }
+                return "[Resposta automática]";
+            }
+
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
+            
+            // Convert chat history to Gemini format
+            var contents = new List<object>();
+            foreach (var msg in messages)
+            {
+                contents.Add(new
+                {
+                    role = msg.role == "assistant" ? "model" : "user",
+                    parts = new[] { new { text = msg.content } }
+                });
+            }
+
+            var payload = new { contents = contents.ToArray() };
+            var json = JsonSerializer.Serialize(payload);
+
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Post, url);
+                req.Headers.Accept.Clear();
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var res = await _http.SendAsync(req);
+                var body = await res.Content.ReadAsStringAsync();
+                var contentType = res.Content.Headers.ContentType?.MediaType ?? "";
+
+                if (!res.IsSuccessStatusCode)
+                {
+                    if (contentType.Contains("html") || body.TrimStart().StartsWith("<"))
+                    {
+                        var text = StripHtml(body);
+                        return $"[Erro no modelo] Resposta HTML do provedor: {text}";
+                    }
+
+                    try
+                    {
+                        using var docErr = JsonDocument.Parse(body);
+                        if (docErr.RootElement.TryGetProperty("error", out var errProp))
                         {
-                            return textProp.GetString() ?? body;
+                            if (errProp.TryGetProperty("message", out var msgProp))
+                            {
+                                return $"[Erro no modelo] {msgProp.GetString()}";
+                            }
+                            return $"[Erro no modelo] {errProp.GetString()}";
+                        }
+                    }
+                    catch { }
+
+                    return $"[Erro no modelo] Status não OK. Conteúdo: {body}";
+                }
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.TryGetProperty("candidates", out var candidates) &&
+                        candidates.ValueKind == JsonValueKind.Array &&
+                        candidates.GetArrayLength() > 0)
+                    {
+                        var first = candidates[0];
+                        if (first.TryGetProperty("content", out var content))
+                        {
+                            if (content.TryGetProperty("parts", out var parts) &&
+                                parts.ValueKind == JsonValueKind.Array &&
+                                parts.GetArrayLength() > 0)
+                            {
+                                var firstPart = parts[0];
+                                if (firstPart.TryGetProperty("text", out var textProp))
+                                {
+                                    return textProp.GetString() ?? "[Sem resposta]";
+                                }
+                            }
                         }
                     }
 
-                    if (doc.RootElement.TryGetProperty("result", out var resProp))
-                    {
-                        return resProp.ToString();
-                    }
-
-                    return body;
+                    return $"[Erro] Formato de resposta inesperado: {body}";
                 }
                 catch (Exception ex)
                 {

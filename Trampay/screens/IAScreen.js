@@ -19,6 +19,29 @@ import { colors, fonts, spacing, borderRadius } from "../styles";
 import api from "../services/api";
 import { AuthContext } from "../AuthContext";
 
+const FAQ_FINANCEIRO = [
+  {
+    pergunta: "O que é fluxo de caixa?",
+    resposta: "Fluxo de caixa é o controle de todas as entradas e saídas de dinheiro do seu negócio. Ele mostra quanto dinheiro você tem disponível em um período específico e ajuda a planejar seus gastos e investimentos."
+  },
+  {
+    pergunta: "Como calcular margem de lucro?",
+    resposta: "Margem de lucro = ((Receita - Custos) / Receita) × 100. Por exemplo: se você vende um produto por R$100 e seus custos são R$60, sua margem é ((100-60)/100) × 100 = 40%."
+  },
+  {
+    pergunta: "Dicas para reduzir despesas",
+    resposta: "1. Negocie com fornecedores\n2. Reduza desperdícios\n3. Automatize processos repetitivos\n4. Renegocie contratos de serviços\n5. Controle rigorosamente pequenas despesas\n6. Compare preços antes de comprar"
+  },
+  {
+    pergunta: "Como precificar meu serviço?",
+    resposta: "Considere: 1) Custos diretos (materiais, mão de obra)\n2) Custos indiretos (aluguel, energia)\n3) Margem de lucro desejada (geralmente 20-40%)\n4) Pesquisa de mercado (preços da concorrência)\n5) Valor percebido pelo cliente"
+  },
+  {
+    pergunta: "Como atrair mais clientes?",
+    resposta: "1. Crie presença nas redes sociais\n2. Peça indicações a clientes satisfeitos\n3. Ofereça promoções para novos clientes\n4. Invista em marketing local\n5. Mostre depoimentos e cases de sucesso\n6. Mantenha qualidade no atendimento"
+  }
+];
+
 export default function IAScreen({ navigation }) {
   const { isPro } = useContext(AuthContext);
   const [message, setMessage] = useState("");
@@ -29,6 +52,7 @@ export default function IAScreen({ navigation }) {
   const [showChats, setShowChats] = useState(false);
   const [typing, setTyping] = useState(false);
   const listRef = useRef(null);
+  const [showFAQ, setShowFAQ] = useState(true);
 
   useEffect(() => {
     if (!isPro) {
@@ -71,6 +95,18 @@ export default function IAScreen({ navigation }) {
     }
   };
 
+  const handleFAQClick = (item) => {
+    setMessages((prev) => [
+      { role: "assistant", content: item.resposta, isLocal: true },
+      { role: "user", content: item.pergunta },
+      ...prev
+    ]);
+    setShowFAQ(false);
+    setTimeout(() => {
+      try { listRef.current?.scrollToOffset({ offset: 0, animated: true }); } catch {}
+    }, 150);
+  };
+
   const sendMessage = async () => {
     if (!message.trim()) return;
     if (!isPro) {
@@ -82,6 +118,7 @@ export default function IAScreen({ navigation }) {
     setTyping(true);
     const userMessage = message.trim();
     setMessage("");
+    setShowFAQ(false);
 
     // add user message immediately
     setMessages((prev) => [{ role: "user", content: userMessage }, ...prev]);
@@ -158,19 +195,24 @@ export default function IAScreen({ navigation }) {
   // Message bubble component
   const MessageRow = ({ item }) => {
     const isUser = item.role === "user";
+    const isLocal = item.isLocal === true;
     const bubbleStyle = isUser ? styles.userBubble : styles.aiBubble;
     const rowStyle = isUser ? styles.rowUser : styles.rowAi;
-    const avatarText = isUser ? "ME" : "AI";
 
     return (
       <View style={[styles.messageRow, rowStyle]}>
-        {!isUser && <View style={styles.avatar}><Text style={styles.avatarText}>AI</Text></View>}
+        {!isUser && (
+          <View style={[styles.avatar, isLocal && { backgroundColor: colors.success }]}>
+            <Text style={styles.avatarText}>{isLocal ? "💡" : "AI"}</Text>
+          </View>
+        )}
         <TouchableOpacity
           activeOpacity={0.9}
           onLongPress={() => copyToClipboard(item.content)}
-          style={[styles.messageBubble, bubbleStyle]}
+          style={[styles.messageBubble, bubbleStyle, isLocal && { backgroundColor: "#e8f5e9" }]}
         >
           <Text selectable style={styles.messageText}>{item.content}</Text>
+          {isLocal && <Text style={styles.localBadge}>Resposta rápida</Text>}
         </TouchableOpacity>
         {isUser && <View style={styles.avatar}><Text style={styles.avatarText}>ME</Text></View>}
       </View>
@@ -199,21 +241,32 @@ export default function IAScreen({ navigation }) {
         </View>
       </View>
 
-      <View style={styles.contextPanel} accessibilityLabel="Contexto e sugestões de uso da IA">
-        <Text style={styles.contextTitle}>Assistente para Microempreendedores</Text>
-        <Text style={styles.contextText}>Peça ajuda para precificar serviços, organizar fluxo de caixa e atrair clientes.</Text>
-        <View style={styles.suggestionsRow}>
-          <TouchableOpacity style={styles.suggestionChip} onPress={() => setMessage("Me ajude a precificar um serviço de pintura residencial de 50m².")}>
-            <Text style={styles.suggestionText}>Precificação</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.suggestionChip} onPress={() => setMessage("Organize meu fluxo de caixa do mês com entradas e saídas previstas.")}>
-            <Text style={styles.suggestionText}>Fluxo de Caixa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.suggestionChip} onPress={() => setMessage("Sugira estratégias simples para conseguir novos clientes nesta semana.")}>
-            <Text style={styles.suggestionText}>Prospecção</Text>
-          </TouchableOpacity>
+      {showFAQ && messages.length === 0 && (
+        <View style={styles.faqContainer}>
+          <Text style={styles.faqTitle}>💡 Perguntas Frequentes - Respostas Rápidas</Text>
+          <Text style={styles.faqSubtitle}>Toque em uma pergunta para ver a resposta instantaneamente</Text>
+          {FAQ_FINANCEIRO.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.faqCard}
+              onPress={() => handleFAQClick(item)}
+            >
+              <Text style={styles.faqQuestion}>❓ {item.pergunta}</Text>
+            </TouchableOpacity>
+          ))}
+          <View style={styles.divider} />
+          <Text style={styles.contextTitle}>Ou pergunte ao Assistente IA</Text>
+          <Text style={styles.contextText}>Use a IA para perguntas personalizadas sobre seu negócio</Text>
+          <View style={styles.suggestionsRow}>
+            <TouchableOpacity style={styles.suggestionChip} onPress={() => setMessage("Me ajude a precificar um serviço de pintura residencial de 50m².")}>
+              <Text style={styles.suggestionText}>Precificação</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.suggestionChip} onPress={() => setMessage("Organize meu fluxo de caixa do mês com entradas e saídas previstas.")}>
+              <Text style={styles.suggestionText}>Fluxo de Caixa</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       <Modal visible={showChats} animationType="slide" transparent>
         <TouchableWithoutFeedback onPress={() => setShowChats(false)}>
@@ -288,12 +341,17 @@ const styles = StyleSheet.create({
   headerButtonOutline: { borderColor: colors.primary, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.md, marginLeft: spacing.sm },
   headerButtonOutlineText: { color: colors.primary, fontFamily: fonts.medium },
 
-  contextPanel: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, margin: spacing.sm, padding: spacing.md, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  contextTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 18 },
-  contextText: { fontFamily: fonts.regular, color: colors.text, marginTop: spacing.xs },
-  suggestionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  suggestionChip: { backgroundColor: colors.secondary, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  suggestionText: { color: colors.text, fontFamily: fonts.medium },
+  faqContainer: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, margin: spacing.sm, padding: spacing.md, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  faqTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 18, marginBottom: spacing.xs },
+  faqSubtitle: { fontFamily: fonts.regular, color: colors.textLight, fontSize: 14, marginBottom: spacing.md },
+  faqCard: { backgroundColor: colors.secondary, borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.sm, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  faqQuestion: { fontFamily: fonts.medium, color: colors.textDark, fontSize: 15 },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.lg },
+  contextTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 16, marginBottom: spacing.xs },
+  contextText: { fontFamily: fonts.regular, color: colors.textLight, marginTop: spacing.xs, fontSize: 14 },
+  suggestionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
+  suggestionChip: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  suggestionText: { color: colors.white, fontFamily: fonts.medium, fontSize: 13 },
 
   chatContainer: { flex: 1 },
 
@@ -306,6 +364,7 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: colors.primaryDark, alignSelf: "flex-end" },
   aiBubble: { backgroundColor: colors.lightGray, alignSelf: "flex-start" },
   messageText: { fontSize: 16, fontFamily: fonts.regular, color: colors.text },
+  localBadge: { fontSize: 11, fontFamily: fonts.medium, color: colors.success, marginTop: spacing.xs, fontStyle: 'italic' },
 
   typingRow: { flexDirection: "row", alignItems: "center", padding: 8, marginTop: 4 },
   typingText: { marginLeft: 8, color: colors.textLight },
