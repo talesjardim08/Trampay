@@ -1,0 +1,44 @@
+ ==> Your service is live 🎉
+     ==> 
+     ==> ///////////////////////////////////////////////////////////
+     ==> 
+     ==> Available at your primary URL https://trampay.onrender.com
+     ==> 
+     ==> ///////////////////////////////////////////////////////////
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://trampay.onrender.com/ - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'RootController.Get (TrampayBackend)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "Get", controller = "Root"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Get() on controller RootController (TrampayBackend).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType25`1[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action RootController.Get (TrampayBackend) in 14.6043ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'RootController.Get (TrampayBackend)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://trampay.onrender.com/ - 200 - application/json;+charset=utf-8 176.8677ms
+     ==> Detected service running on port 5000
+     ==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+     ==> Deploying...
+.NET location: /usr/share/dotnet/
+The following frameworks were found:
+  8.0.22 at [/usr/share/dotnet/shared/Microsoft.NETCore.App]
+Learn more:
+https://aka.ms/dotnet/app-launch-failed
+To install missing framework, download:
+https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_version=7.0.0&arch=x64&rid=linux-x64&os=debian.12
+You must install or update .NET to run this application.
+App: /app/TrampayBackend.dll
+Architecture: x64
+Framework: 'Microsoft.NETCore.App', version '7.0.0' (x64)
+.NET location: /usr/share/dotnet/
+The following frameworks were found:
+  8.0.22 at [/usr/share/dotnet/shared/Microsoft.NETCore.App]
+Learn more:
+https://aka.ms/dotnet/app-launch-failed
+To install missing framework, download:
+https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_version=7.0.0&arch=x64&rid=linux-x64&os=debian.12
+     ==> Exited with status 150
+     ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
