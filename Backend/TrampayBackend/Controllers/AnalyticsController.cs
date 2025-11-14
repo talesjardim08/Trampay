@@ -1,3 +1,4 @@
+// project/Trampay-main/Backend/TrampayBackend/Controllers/AnalyticsController.cs
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -21,9 +22,6 @@ namespace TrampayBackend.Controllers
             _logger = logger;
         }
 
-        // ========================================================================
-        // 1. RESUMO GERAL (REVENUE, EXPENSES, CLIENTS, SERVICES, ETC.)
-        // ========================================================================
         [HttpGet("summary")]
         [Authorize]
         public async Task<IActionResult> GetSummary()
@@ -37,9 +35,8 @@ namespace TrampayBackend.Controllers
                         (SELECT COUNT(*) FROM clients) AS Clients,
                         (SELECT COUNT(*) FROM services) AS Services,
                         0 AS InventoryValue,
-                        (SELECT COUNT(*) FROM events WHERE date >= CURRENT_DATE()) AS UpcomingEvents
-                    FROM transactions;
-                ";
+                        (SELECT COUNT(*) FROM events WHERE event_date >= CURRENT_DATE()) AS UpcomingEvents
+                    FROM transactions;";
 
                 var result = await _db.QueryFirstOrDefaultAsync(sql);
 
@@ -60,9 +57,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // ========================================================================
-        // 2. DESPESAS POR CATEGORIA
-        // ========================================================================
         [HttpGet("expenses-by-category")]
         [Authorize]
         public async Task<IActionResult> GetExpensesByCategory()
@@ -87,9 +81,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // ========================================================================
-        // 3. RECEITAS POR CATEGORIA
-        // ========================================================================
         [HttpGet("revenue-by-category")]
         [Authorize]
         public async Task<IActionResult> GetRevenueByCategory()
@@ -114,9 +105,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // ========================================================================
-        // 4. CATEGORIAS (DE TRANSACÕES)
-        // ========================================================================
         [HttpGet("categories")]
         [Authorize]
         public async Task<IActionResult> GetCategories()
@@ -140,9 +128,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // ========================================================================
-        // 5. GRÁFICO — TENDÊNCIAS MENSAIS
-        // ========================================================================
         [HttpGet("growth-trends")]
         [Authorize]
         public async Task<IActionResult> GetGrowthTrends()
@@ -151,7 +136,7 @@ namespace TrampayBackend.Controllers
             {
                 var sql = @"
                     SELECT 
-                        DATE_FORMAT(date, '%Y-%m') AS month,
+                        DATE_FORMAT(transaction_date, '%Y-%m') AS month,
                         SUM(CASE WHEN type = 'income' THEN amount END) AS revenue,
                         SUM(CASE WHEN type = 'expense' THEN amount END) AS expenses
                     FROM transactions
@@ -166,6 +151,81 @@ namespace TrampayBackend.Controllers
             {
                 _logger.LogError(ex, "Erro ao gerar crescimento mensal.");
                 return StatusCode(500, new { error = "Erro ao gerar tendências de crescimento." });
+            }
+        }
+
+        [HttpGet("cashflow")]
+        [Authorize]
+        public async Task<IActionResult> GetCashFlow([FromQuery] string period = "month")
+        {
+            try
+            {
+                var sql = period == "week"
+                    ? @"SELECT DATE(transaction_date) AS day,
+                            SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
+                            SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expenses
+                        FROM transactions
+                        WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                        GROUP BY day
+                        ORDER BY day ASC"
+                    : @"SELECT DATE_FORMAT(transaction_date, '%Y-%m') AS month,
+                            SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
+                            SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expenses
+                        FROM transactions
+                        WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                        GROUP BY month
+                        ORDER BY month ASC";
+
+                var rows = await _db.QueryAsync(sql);
+                return Ok(rows);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar cashflow.");
+                return StatusCode(500, new { error = "Erro ao gerar fluxo de caixa." });
+            }
+        }
+
+        [HttpGet("top-clients")]
+        [Authorize]
+        public async Task<IActionResult> GetTopClients([FromQuery] int limit = 5)
+        {
+            try
+            {
+                var sql = @"SELECT c.id, c.name, COALESCE(SUM(p.amount),0) AS total
+                            FROM clients c
+                            LEFT JOIN payments p ON p.client_id = c.id
+                            GROUP BY c.id, c.name
+                            ORDER BY total DESC
+                            LIMIT @Limit";
+                var rows = await _db.QueryAsync(sql, new { Limit = limit });
+                return Ok(rows);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao listar top clients.");
+                return StatusCode(500, new { error = "Erro ao listar top clientes." });
+            }
+        }
+
+        [HttpGet("profitable-items")]
+        [Authorize]
+        public async Task<IActionResult> GetProfitableItems([FromQuery] int limit = 5)
+        {
+            try
+            {
+                var sql = @"SELECT id, name, selling_price, cost_price,
+                                (selling_price - cost_price) AS margin
+                            FROM inventory_items
+                            ORDER BY margin DESC
+                            LIMIT @Limit";
+                var rows = await _db.QueryAsync(sql, new { Limit = limit });
+                return Ok(rows);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao listar itens lucrativos.");
+                return StatusCode(500, new { error = "Erro ao listar itens lucrativos." });
             }
         }
     }

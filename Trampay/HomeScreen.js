@@ -86,7 +86,8 @@ const HomeScreen = ({ navigation, route }) => {
 
   // API client (local) — insere token automaticamente a partir do AsyncStorage
 
-  // --- Helper: persist e read utilities (AsyncStorage + AsyncStorage) ---
+  // --- Helper: persist e read utilities (AsyncStorage + AsyncStorage) ---
+
 
   const saveAsyncData = async (key, data) => {
     try {
@@ -137,7 +138,6 @@ const HomeScreen = ({ navigation, route }) => {
       console.error('[Home] erro ao carregar dados locais:', err);
       setError('Erro ao carregar dados locais.');
     } finally {
-      setLoading(false); // mostra UI mesmo que api remoto ainda não tenha respondido
     }
   };
 
@@ -165,7 +165,7 @@ const HomeScreen = ({ navigation, route }) => {
   const fetchProfileFromServer = async () => {
     try {
       const resp = await api.get('/auth/me');
-      console.log('[Home] perfil obtido do servidor:', resp?.data?.displayName || resp?.data?.email);
+      console.log('[Home] perfil obtido do servidor:', resp?.data?.name || resp?.data?.email);
       return resp.data;
     } catch (err) {
       console.warn('[Home] falha ao buscar perfil no servidor:', err?.response?.data || err.message);

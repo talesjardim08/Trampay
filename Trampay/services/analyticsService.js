@@ -1,3 +1,4 @@
+// project/Trampay-main/Trampay/services/analyticsService.js
 import api from './api';
 
 export const fetchAnalyticsSummary = async () => {

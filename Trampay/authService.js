@@ -1,10 +1,8 @@
+// project/Trampay-main/Trampay/authService.js
 // src/screens/authService.js
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// ---------------------------------------------
-// 🔧 Configuração da API
-// ---------------------------------------------
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://trampay.onrender.com/api';
 
 const api = axios.create({
@@ -12,9 +10,6 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// ---------------------------------------------
-// 🔒 Armazena token com segurança
-// ---------------------------------------------
 async function saveToken(token) {
   try {
     await AsyncStorage.setItem("token", token);
@@ -24,9 +19,6 @@ async function saveToken(token) {
   }
 }
 
-// ---------------------------------------------
-// 🧹 Limpa todo cache local após novo login
-// ---------------------------------------------
 export async function clearLocalCache() {
   try {
     await AsyncStorage.multiRemove([
@@ -34,6 +26,10 @@ export async function clearLocalCache() {
       "balance",
       "lastSync",
       "outbox",
+      "trampay_transactions",
+      "trampay_balance",
+      "trampay_transactions_outbox",
+      "userEvents",
     ]);
     console.log("[Auth] Cache local limpo após novo login.");
   } catch (err) {
@@ -41,9 +37,6 @@ export async function clearLocalCache() {
   }
 }
 
-// ---------------------------------------------
-// 🔑 LOGIN
-// ---------------------------------------------
 export async function login(email, senha) {
   try {
     const response = await api.post("/auth/login", {
@@ -57,26 +50,30 @@ export async function login(email, senha) {
 
     await saveToken(response.data.token);
 
-    // 🧹 limpa cache antes de continuar
     await clearLocalCache();
 
     console.log("[Auth] Login realizado com sucesso. Cache limpo.");
     return response.data;
   } catch (error) {
     console.error("❌ Erro no login:", error.response?.data || error.message);
-    throw error;
+    const err = new Error(
+      error.response?.data?.error || error.response?.data?.message || error.message || "Falha ao entrar"
+    );
+    err.response = error.response;
+    throw err;
   }
 }
 
-// ---------------------------------------------
-// 🧾 REGISTRO
-// ---------------------------------------------
 export async function registerUser(userData) {
   const payload = {
     name: userData.DisplayName || userData.LegalName || userData.Name || "",
     email: userData.Email,
     password: userData.Senha || userData.password,
     phone: userData.Phone || "",
+    confirmPassword: userData.confirmPassword || userData.Senha || userData.password,
+    accountType: userData.AccountType || 'pf',
+    documentType: userData.DocumentType || (userData.AccountType === 'pj' ? 'CNPJ' : 'CPF'),
+    documentNumber: userData.DocumentNumber || '',
   };
 
   console.log("📦 Enviando payload:", payload);
@@ -95,9 +92,6 @@ export async function registerUser(userData) {
   }
 }
 
-// ---------------------------------------------
-// 🔄 ESQUECI SENHA
-// ---------------------------------------------
 export async function forgotPassword(payload) {
   try {
     const response = await api.post("/auth/forgot-password", payload);
@@ -117,9 +111,6 @@ export async function forgotPassword(payload) {
   }
 }
 
-// ---------------------------------------------
-// 👤 PERFIL (verifica token e busca dados do usuário)
-// ---------------------------------------------
 export async function getUserProfile() {
   try {
     const token = await AsyncStorage.getItem("token");
@@ -128,7 +119,7 @@ export async function getUserProfile() {
       return null;
     }
 
-    const response = await api.get("/auth/profile", {
+    const response = await api.get("/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -140,20 +131,16 @@ export async function getUserProfile() {
   }
 }
 
-// ---------------------------------------------
-// 🚪 LOGOUT
-// ---------------------------------------------
 export async function logout() {
   try {
     await AsyncStorage.removeItem("token");
-    // Limpa AsyncStorage chave a chave (remover userProfile também)
     await AsyncStorage.multiRemove([
       "transactions",
       "balance",
       "lastSync",
       "outbox",
       "userProfile",
-      "someOtherKeyIfExists" // adicione outras chaves usadas pelo app
+      "someOtherKeyIfExists"
     ]);
     console.log("[Auth] Logout completo e cache limpo.");
   } catch (error) {
@@ -161,7 +148,4 @@ export async function logout() {
   }
 }
 
-// ---------------------------------------------
-// Exporta API para uso geral
-// ---------------------------------------------
 export default api;

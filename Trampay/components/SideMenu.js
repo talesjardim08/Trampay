@@ -1,5 +1,6 @@
+// project/Trampay-main/Trampay/components/SideMenu.js
 import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, StatusBar, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../styles';
 import { AuthContext } from '../AuthContext';
@@ -84,89 +85,91 @@ const SideMenu = ({ navigation, onClose }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('EditProfile')}>
-          <View style={styles.menuItemRow}>
-            <Ionicons name="person-circle" size={20} color={colors.primaryDark} />
-            <Text style={styles.menuItemText}>Editar meus dados</Text>
-          </View>
-        </TouchableOpacity>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.menuContainer}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('EditProfile')}>
+            <View style={styles.menuItemRow}>
+              <Ionicons name="person-circle" size={20} color={colors.primaryDark} />
+              <Text style={styles.menuItemText}>Editar meus dados</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TrampayIA')}>
-          <View style={styles.menuItemRow}>
-            <Ionicons name="chatbubbles" size={20} color={colors.primaryDark} />
-            <Text style={styles.menuItemText}>Trampay I.A</Text>
-          </View>
-          {!isPro && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TrampayIA')}>
+            <View style={styles.menuItemRow}>
+              <Ionicons name="chatbubbles" size={20} color={colors.primaryDark} />
+              <Text style={styles.menuItemText}>Trampay I.A</Text>
+            </View>
+            {!isPro && <Text style={styles.lockedText}>Exclusivo Pro</Text>}
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TaxSimulator')}>
-          <View style={styles.menuItemRow}>
-            <MaterialIcons name="calculate" size={20} color={colors.primaryDark} />
-            <Text style={styles.menuItemText}>Simulador de impostos e taxas</Text>
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('TaxSimulator')}>
+            <View style={styles.menuItemRow}>
+              <MaterialIcons name="calculate" size={20} color={colors.primaryDark} />
+              <Text style={styles.menuItemText}>Simulador de impostos e taxas</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('AssinePro')}>
-          <View style={styles.menuItemRow}>
-            <MaterialIcons name="star" size={20} color={colors.primaryDark} />
-            <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('AssinePro')}>
+            <View style={styles.menuItemRow}>
+              <MaterialIcons name="star" size={20} color={colors.primaryDark} />
+              <Text style={styles.menuItemText}>{isPro ? 'Minha Assinatura PRO' : 'Assine o Pro'}</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('Settings')}>
-          <View style={styles.menuItemRow}>
-            <Ionicons name="settings" size={20} color={colors.primaryDark} />
-            <Text style={styles.menuItemText}>Configurações</Text>
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('Settings')}>
+            <View style={styles.menuItemRow}>
+              <Ionicons name="settings" size={20} color={colors.primaryDark} />
+              <Text style={styles.menuItemText}>Configurações</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
-          <View style={styles.menuItemRow}>
-            <MaterialIcons name="logout" size={20} color={colors.error} />
-            <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
+            <View style={styles.menuItemRow}>
+              <MaterialIcons name="logout" size={20} color={colors.error} />
+              <Text style={[styles.menuItemText, { color: colors.error }]}>Sair da conta</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.featureCards}>
+        <View style={styles.featureCards}>
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: '#e8f4fd' }]}
+            onPress={() => handleNavigation('Precificacao')}
+          >
+            <View style={styles.featureIcon}>
+              <MaterialIcons
+                name="attach-money"
+                size={20}
+                color={colors.primaryDark}
+              />
+            </View>
+            <Text style={styles.featureText}>Precificação</Text>
+            {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: '#e0f2f1' }]}
+            onPress={() => handleNavigation('CambioTrading')}
+          >
+            <View style={styles.featureIcon}>
+              <MaterialIcons
+                name="trending-up"
+                size={20}
+                color={colors.primaryDark}
+              />
+            </View>
+            <Text style={styles.featureText}>Trading</Text>
+            {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={[styles.featureCard, { backgroundColor: '#e8f4fd' }]}
-          onPress={() => handleNavigation('Precificacao')}
+          style={styles.closeButton}
+          onPress={onClose || (() => navigation.goBack())}
         >
-          <View style={styles.featureIcon}>
-            <MaterialIcons
-              name="attach-money"
-              size={20}
-              color={colors.primaryDark}
-            />
-          </View>
-          <Text style={styles.featureText}>Precificação</Text>
-          {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
+          <Text style={styles.closeButtonText}>Fechar Menu</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.featureCard, { backgroundColor: '#e0f2f1' }]}
-          onPress={() => handleNavigation('CambioTrading')}
-        >
-          <View style={styles.featureIcon}>
-            <MaterialIcons
-              name="trending-up"
-              size={20}
-              color={colors.primaryDark}
-            />
-          </View>
-          <Text style={styles.featureText}>Trading</Text>
-          {!isPro && <Text style={styles.lockedBadge}>PRO</Text>}
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.closeButton}
-        onPress={onClose || (() => navigation.goBack())}
-      >
-        <Text style={styles.closeButtonText}>Fechar Menu</Text>
-      </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -243,6 +246,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.white,
   },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: spacing.xl * 2 },
   menuContainer: { 
     paddingHorizontal: spacing.lg, 
     paddingTop: spacing.lg,

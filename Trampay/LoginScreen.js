@@ -1,3 +1,4 @@
+// project/Trampay-main/Trampay/LoginScreen.js
 import React, { useState, useRef, useEffect } from "react";
 import {
   SafeAreaView,
@@ -11,12 +12,13 @@ import {
   ActivityIndicator,
   Animated,
   Image,
-  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import { MaterialIcons } from "@expo/vector-icons";
-import { login } from "./authService"; 
+import { login, getUserProfile } from "./authService"; 
+import { listTransactions } from "./TransactionsService";
+import { fetchBalance } from "./services/balanceService";
 import { colors, spacing, fonts } from "./styles";
 
 export default function LoginScreen({ navigation }) {
@@ -24,6 +26,7 @@ export default function LoginScreen({ navigation }) {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [secure, setSecure] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -32,16 +35,20 @@ export default function LoginScreen({ navigation }) {
 
   async function handleLogin() {
     if (!email || !senha) {
-      Alert.alert('Erro', 'Preencha email e senha');
+      setErrorMsg('Preencha email e senha');
       return;
     }
     try {
       setLoading(true);
+      setErrorMsg(null);
       await login(email, senha);
-      navigation.replace('Home');
+      const profile = await getUserProfile();
+      try { await fetchBalance('BRL'); } catch {}
+      try { await listTransactions(); } catch {}
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (err) {
       console.log('Erro de login:', err.response?.data || err.message);
-      Alert.alert('Erro', err.response?.data?.error || 'Falha ao entrar');
+      setErrorMsg(err.response?.data?.error || err.message || 'Falha ao entrar');
     } finally {
       setLoading(false);
     }
@@ -66,6 +73,11 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.title}>Bem-vindo de volta</Text>
 
             <View style={styles.card}>
+              {errorMsg ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{errorMsg}</Text>
+                </View>
+              ) : null}
               <Text style={styles.label}>E-mail</Text>
               <TextInput
                 style={styles.input}
@@ -153,6 +165,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
+  errorBox: {
+    backgroundColor: '#fdecea',
+    borderColor: '#f5c6cb',
+    borderWidth: 1,
+    padding: spacing.sm,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+  },
+  errorText: { color: '#d32f2f', fontFamily: fonts.medium, textAlign: 'center' },
   label: { fontSize: 13, color: colors.primaryDark, marginBottom: 6, fontFamily: fonts.semibold },
   input: {
     height: 48,

@@ -1,3 +1,4 @@
+// project/Trampay-main/Backend/TrampayBackend/Controllers/UserBalanceController.cs
 using System;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,6 @@ namespace TrampayBackend.Controllers
             _db = db;
         }
 
-        // GET /api/users/balance - Obtém saldo em mãos do usuário
         [Authorize]
         [HttpGet("balance")]
         public async Task<IActionResult> GetBalance([FromQuery] string currency = "BRL")
@@ -30,7 +30,6 @@ namespace TrampayBackend.Controllers
             if (!long.TryParse(userIdClaim, out long userId))
                 return BadRequest(new { error = "ID de usuário inválido" });
 
-            // Normalize currency
             currency = currency.Trim().ToUpper();
             if (currency.Length != 3)
                 return BadRequest(new { error = "Currency deve ter 3 caracteres (ex: BRL, USD)" });
@@ -44,7 +43,6 @@ namespace TrampayBackend.Controllers
                     LIMIT 1",
                     new { UserId = userId, Currency = currency });
 
-                // Se não existir registro, retorna 0
                 return Ok(new { 
                     balance = balance ?? 0.00m, 
                     currency = currency,
@@ -58,7 +56,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // PUT /api/users/balance - Atualiza saldo em mãos do usuário (override completo)
         [Authorize]
         [HttpPut("balance")]
         public async Task<IActionResult> UpdateBalance([FromBody] UpdateBalanceDto dto)
@@ -73,14 +70,12 @@ namespace TrampayBackend.Controllers
             if (dto == null)
                 return BadRequest(new { error = "Dados inválidos" });
 
-            // Normalize currency
             var currency = string.IsNullOrEmpty(dto.Currency) ? "BRL" : dto.Currency.Trim().ToUpper();
             if (currency.Length != 3)
                 return BadRequest(new { error = "Currency deve ter 3 caracteres (ex: BRL, USD)" });
 
             try
             {
-                // Usa INSERT ... ON DUPLICATE KEY UPDATE para criar ou atualizar
                 var sql = @"
                     INSERT INTO user_balance (user_id, balance, currency, updated_at) 
                     VALUES (@UserId, @Balance, @Currency, NOW())
@@ -111,7 +106,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // PATCH /api/users/balance/adjust - Ajusta saldo (adiciona ou subtrai) - ATOMIC
         [Authorize]
         [HttpPatch("balance/adjust")]
         public async Task<IActionResult> AdjustBalance([FromBody] AdjustBalanceDto dto)
@@ -126,14 +120,12 @@ namespace TrampayBackend.Controllers
             if (dto == null || dto.Amount == 0)
                 return BadRequest(new { error = "Valor de ajuste inválido" });
 
-            // Normalize currency: uppercase, 3 chars
             var currency = string.IsNullOrEmpty(dto.Currency) ? "BRL" : dto.Currency.Trim().ToUpper();
             if (currency.Length != 3)
                 return BadRequest(new { error = "Currency deve ter 3 caracteres (ex: BRL, USD)" });
 
             try
             {
-                // ATOMIC update: increment/decrement balance directly in SQL
                 var sql = @"
                     INSERT INTO user_balance (user_id, balance, currency, updated_at) 
                     VALUES (@UserId, @Amount, @Currency, NOW())
@@ -148,7 +140,6 @@ namespace TrampayBackend.Controllers
                     Currency = currency
                 });
 
-                // Fetch updated balance for response
                 var newBalance = await _db.QueryFirstOrDefaultAsync<decimal>(@"
                     SELECT balance 
                     FROM user_balance 

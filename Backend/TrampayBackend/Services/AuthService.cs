@@ -1,3 +1,4 @@
+// project/Trampay-main/Backend/TrampayBackend/Services/AuthService.cs
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -65,7 +66,7 @@ namespace TrampayBackend.Services
             try
             {
                 var user = await _db.QueryFirstOrDefaultAsync<User>(
-                    "SELECT * FROM users WHERE Email = @Email LIMIT 1", new { Email = email });
+                    "SELECT * FROM users WHERE email = @Email LIMIT 1", new { Email = email });
 
                 if (user == null)
                     return (false, "Usuário não encontrado", null);
@@ -102,7 +103,7 @@ namespace TrampayBackend.Services
                 newUser.IsActive = true;
 
                 const string sql = @"
-                    INSERT INTO users (AccountType, DocumentType, DocumentNumber, LegalName, DisplayName, BirthDate, Email, Phone, PasswordHash, IsActive, IsVerified, CreatedAt, UpdatedAt)
+                    INSERT INTO users (account_type, document_type, document_number, legal_name, display_name, birth_date, email, phone, password_hash, is_active, is_verified, created_at, updated_at)
                     VALUES (@AccountType, @DocumentType, @DocumentNumber, @LegalName, @DisplayName, @BirthDate, @Email, @Phone, @PasswordHash, @IsActive, @IsVerified, @CreatedAt, @UpdatedAt);
                     SELECT LAST_INSERT_ID();";
 

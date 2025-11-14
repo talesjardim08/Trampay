@@ -12,8 +12,10 @@ import {
   Modal
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, fonts, spacing } from '../styles';
+import { fetchBalance } from '../services/balanceService';
+import api from '../authService';
 import AddTransactionModal from '../components/AddTransactionModal';
 import PieChart from '../components/PieChart';
 import LineChart from '../components/LineChart';
@@ -39,12 +41,24 @@ const CashFlowScreen = ({ navigation }) => {
   useEffect(() => {
     loadTransactions();
     loadBalance();
+    (async () => {
+      try {
+        const serverBalance = await fetchBalance('BRL');
+        if (typeof serverBalance === 'number') {
+          await saveBalance(serverBalance);
+        }
+        const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
+        if (resp?.data && Array.isArray(resp.data)) {
+          // opcional: usar resp.data para melhorar cálculo de gráficos, mantendo compatibilidade
+        }
+      } catch (err) {}
+    })();
   }, []);
 
   // Carregar transações
   const loadTransactions = async () => {
     try {
-      const stored = await SecureStore.getItemAsync(TRANSACTIONS_STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (stored) {
         const transactionsList = JSON.parse(stored);
         setTransactions(transactionsList);
@@ -57,7 +71,7 @@ const CashFlowScreen = ({ navigation }) => {
   // Carregar saldo
   const loadBalance = async () => {
     try {
-      const stored = await SecureStore.getItemAsync(BALANCE_STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(BALANCE_STORAGE_KEY);
       if (stored) {
         setBalance(parseFloat(stored));
       }
@@ -69,7 +83,7 @@ const CashFlowScreen = ({ navigation }) => {
   // Salvar transações
   const saveTransactions = async (transactionsList) => {
     try {
-      await SecureStore.setItemAsync(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactionsList));
+      await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactionsList));
       setTransactions(transactionsList);
     } catch (error) {
       console.error('Erro ao salvar transações:', error);
@@ -80,7 +94,7 @@ const CashFlowScreen = ({ navigation }) => {
   // Salvar saldo
   const saveBalance = async (newBalance) => {
     try {
-      await SecureStore.setItemAsync(BALANCE_STORAGE_KEY, newBalance.toString());
+      await AsyncStorage.setItem(BALANCE_STORAGE_KEY, newBalance.toString());
       setBalance(newBalance);
     } catch (error) {
       console.error('Erro ao salvar saldo:', error);

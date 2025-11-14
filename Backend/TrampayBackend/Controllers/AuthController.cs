@@ -1,3 +1,4 @@
+// project/Trampay-main/Backend/TrampayBackend/Controllers/AuthController.cs
 using System;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
@@ -12,27 +13,6 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace TrampayBackend.Controllers
 {
-    /*
-     * AuthController.cs
-     * -----------------
-     * Controller único responsável por:
-     *  - register (POST /api/auth/register)
-     *  - login    (POST /api/auth/login)
-     *  - me       (GET  /api/auth/me)  <-- este endpoint permanece aqui para compatibilidade
-     *  - refresh  (POST /api/auth/refresh)
-     *  - logout   (POST /api/auth/logout)
-     *
-     * Observações:
-     *  - Usa Dapper + IDbConnection (injeção de dependência) para consultas simples.
-     *  - Usa BCrypt.Net para hash de senhas (assegure que o package BCrypt.Net-Next está instalado).
-     *  - JWT é gerado com parâmetros via IConfiguration (appsettings.json).
-     *  - Refresh token aqui é tratado de forma simples (armazenado na tabela refresh_tokens).
-     *    Se você já tem outra implementação (Redis, Identity, etc.), eu adapto quando você mandar o arquivo original.
-     *
-     * Segurança:
-     *  - Nunca logue senhas em texto.
-     *  - Tokens sensíveis devem ser armazenados com segurança no client (SecureStorage).
-     */
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -41,8 +21,6 @@ namespace TrampayBackend.Controllers
         private readonly IConfiguration _config;
         private readonly ILogger<AuthController> _logger;
 
-        // Config keys usados:
-        // Jwt:Key, Jwt:Issuer, Jwt:Audience, Jwt:ExpiryMinutes, Jwt:RefreshExpiryDays
         public AuthController(IDbConnection db, IConfiguration config, ILogger<AuthController> logger)
         {
             _db = db;
@@ -50,10 +28,6 @@ namespace TrampayBackend.Controllers
             _logger = logger;
         }
 
-        // -----------------------------
-        // POST /api/auth/register
-        // Registra um usuário (PF/PJ handling deve ser feita no body do cliente)
-        // -----------------------------
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterDto body)
         {
@@ -61,35 +35,39 @@ namespace TrampayBackend.Controllers
             {
                 if (body == null) return BadRequest(new { error = "Payload inválido." });
 
-                // Validações simples -- expandir conforme necessidade
                 if (string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.Password))
                     return BadRequest(new { error = "Email e senha são obrigatórios." });
+                if (!string.IsNullOrWhiteSpace(body.ConfirmPassword) && body.Password != body.ConfirmPassword)
+                    return BadRequest(new { error = "As senhas não conferem." });
 
-                // Verifica se o email já existe
-                var existing = _db.QueryFirstOrDefault<long?>("SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = body.Email.Trim().ToLower() });
-                if (existing.HasValue)
-                    return BadRequest(new { error = "Email já cadastrado." });
+                var existingEmail = _db.QueryFirstOrDefault<long?>("SELECT id FROM users WHERE email = @Email LIMIT 1", new { Email = body.Email.Trim().ToLower() });
+                if (existingEmail.HasValue)
+                    return BadRequest(new { error = "E-mail já cadastrado." });
 
-                // Faz hash da senha
+                if (!string.IsNullOrWhiteSpace(body.DocumentNumber))
+                {
+                    var existingDoc = _db.QueryFirstOrDefault<long?>("SELECT id FROM users WHERE document_number = @Doc LIMIT 1", new { Doc = body.DocumentNumber.Trim() });
+                    if (existingDoc.HasValue)
+                        return BadRequest(new { error = "CPF/CNPJ já cadastrado." });
+                }
+
                 var hashed = BCrypt.Net.BCrypt.HashPassword(body.Password);
 
-                // Insere usuário (adapte colunas conforme seu schema; use id_user se for o seu padrão)
                 var sql = @"
-                    INSERT INTO users (display_name, email, password_hash, phone, created_at)
-                    VALUES (@DisplayName, @Email, @PasswordHash, @Phone, NOW());
-                    SELECT LAST_INSERT_ID();
-                ";
+                    INSERT INTO users (display_name, email, password_hash, phone, account_type, document_type, document_number, created_at)
+                    VALUES (@DisplayName, @Email, @PasswordHash, @Phone, @AccountType, @DocumentType, @DocumentNumber, NOW());
+                    SELECT LAST_INSERT_ID();";
 
                 var newId = _db.ExecuteScalar<long>(sql, new
                 {
                     DisplayName = body.Name?.Trim(),
                     Email = body.Email.Trim().ToLower(),
                     PasswordHash = hashed,
-                    Phone = body.Phone
+                    Phone = body.Phone,
+                    AccountType = string.IsNullOrWhiteSpace(body.AccountType) ? "pf" : body.AccountType.Trim().ToLower(),
+                    DocumentType = string.IsNullOrWhiteSpace(body.DocumentType) ? "CPF" : body.DocumentType.Trim().ToUpper(),
+                    DocumentNumber = string.IsNullOrWhiteSpace(body.DocumentNumber) ? null : body.DocumentNumber.Trim()
                 });
-
-                // Opcional: criar registro inicial em outras tabelas (balance, profile, settings)
-                // Ex.: INSERT INTO balance (user_id, balance) VALUES (@Id, 0);
 
                 return Ok(new { message = "Registro concluído com sucesso.", id = newId });
             }
@@ -100,10 +78,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // -----------------------------
-        // POST /api/auth/login
-        // Faz login e retorna token JWT + refresh token
-        // -----------------------------
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginDto body)
         {
@@ -112,19 +86,16 @@ namespace TrampayBackend.Controllers
                 if (body == null || string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.Password))
                     return BadRequest(new { error = "Email e senha são obrigatórios." });
 
-                // Recupera usuário por email
                 var sql = "SELECT id AS Id, email, password_hash AS PasswordHash FROM users WHERE email = @Email LIMIT 1";
                 var user = _db.QueryFirstOrDefault<LoginUserDto>(sql, new { Email = body.Email.Trim().ToLower() });
 
                 if (user == null)
-                    return Unauthorized(new { error = "Credenciais inválidas." });
+                    return NotFound(new { error = "Usuário não encontrado." });
 
-                // Verifica senha
                 var ok = BCrypt.Net.BCrypt.Verify(body.Password, user.PasswordHash);
                 if (!ok)
-                    return Unauthorized(new { error = "Credenciais inválidas." });
+                    return Unauthorized(new { error = "Senha incorreta." });
 
-                // Gera JWT
                 var token = GenerateJwtToken(user.Id.ToString(), user.Email);
                 var refreshToken = GenerateRefreshToken();
 
@@ -142,10 +113,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // -----------------------------
-        // POST /api/auth/refresh
-        // Recebe refresh token e retorna novo par (token, refreshToken)
-        // -----------------------------
         [HttpPost("refresh")]
         public IActionResult Refresh([FromBody] RefreshDto body)
         {
@@ -154,7 +121,6 @@ namespace TrampayBackend.Controllers
                 if (body == null || string.IsNullOrWhiteSpace(body.RefreshToken))
                     return BadRequest(new { error = "Refresh token obrigatório." });
 
-                // Busca refresh token no banco
                 var sql = "SELECT id, user_id, token, expires_at FROM refresh_tokens WHERE token = @Token LIMIT 1";
                 var rt = _db.QueryFirstOrDefault<dynamic>(sql, new { Token = body.RefreshToken });
 
@@ -163,14 +129,12 @@ namespace TrampayBackend.Controllers
                 DateTime expiresAt = rt.expires_at;
                 if (expiresAt < DateTime.UtcNow) return Unauthorized(new { error = "Refresh token expirado." });
 
-                // Gera novo token e novo refresh token (rotating)
                 var userId = rt.user_id.ToString();
                 var email = _db.ExecuteScalar<string>("SELECT email FROM users WHERE id = @Id LIMIT 1", new { Id = userId });
 
                 var newToken = GenerateJwtToken(userId, email);
                 var newRefresh = GenerateRefreshToken();
 
-                // Salva novo refresh e remove/invalidar o antigo
                 var insertSql = @"
                     INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
                     VALUES (@UserId, @Token, DATE_ADD(NOW(), INTERVAL @Days DAY), NOW());
@@ -178,7 +142,6 @@ namespace TrampayBackend.Controllers
                 int refreshDays = int.TryParse(_config["Jwt:RefreshExpiryDays"], out var d) ? d : 30;
                 _db.Execute(insertSql, new { UserId = userId, Token = newRefresh, Days = refreshDays });
 
-                // Invalida o antigo (pode ser delete ou marcar como revoked)
                 _db.Execute("DELETE FROM refresh_tokens WHERE id = @Id", new { Id = (long)rt.id });
 
                 return Ok(new { token = newToken, refreshToken = newRefresh });
@@ -190,17 +153,12 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // -----------------------------
-        // POST /api/auth/logout
-        // Invalida refresh token do usuário (logout)
-        // -----------------------------
         [Authorize]
         [HttpPost("logout")]
         public IActionResult Logout([FromBody] LogoutDto body)
         {
             try
             {
-                // Se o client enviar o refresh token, removemos. Caso contrário, removemos todos do user.
                 if (body != null && !string.IsNullOrEmpty(body.RefreshToken))
                 {
                     _db.Execute("DELETE FROM refresh_tokens WHERE token = @Token", new { Token = body.RefreshToken });
@@ -223,10 +181,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // -----------------------------
-        // GET /api/auth/me
-        // Retorna dados do usuário logado (mantido aqui para compatibilidade)
-        // -----------------------------
         [Authorize]
         [HttpGet("me")]
         public IActionResult Me()
@@ -235,8 +189,7 @@ namespace TrampayBackend.Controllers
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("id")?.Value;
                 if (string.IsNullOrEmpty(userId)) return Unauthorized();
-
-                var sql = "SELECT id_user AS Id, name, email, phone, created_at FROM users WHERE id_user = @Id LIMIT 1";
+                var sql = "SELECT id AS Id, display_name AS name, email, phone, created_at FROM users WHERE id = @Id LIMIT 1";
                 var user = _db.QueryFirstOrDefault<dynamic>(sql, new { Id = userId });
 
                 if (user == null) return NotFound(new { error = "Usuário não encontrado." });
@@ -250,9 +203,6 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        // -----------------------------
-        // Helpers (privados)
-        // -----------------------------
         private string GenerateJwtToken(string userId, string email)
         {
             var key = _config["Jwt:Secret"];
@@ -283,21 +233,21 @@ namespace TrampayBackend.Controllers
 
         private string GenerateRefreshToken()
         {
-            // refresh token simples: GUID + base64 (pode melhorar para tokens criptograficamente seguros)
             var random = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(random));
         }
     }
 
-    // -----------------------------
-    // DTOs usados por este controller
-    // -----------------------------
     public class RegisterDto
     {
         public string Name { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
+        public string ConfirmPassword { get; set; }
         public string Phone { get; set; }
+        public string AccountType { get; set; }
+        public string DocumentType { get; set; }
+        public string DocumentNumber { get; set; }
     }
 
     public class LoginDto

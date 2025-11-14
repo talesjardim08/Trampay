@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// project/Trampay-main/Trampay/screens/TradingHomeScreen.js
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import withPremiumProtection from './hocs/withPremiumProtection';
+import { AuthContext } from '../AuthContext';
 
 const colors = {
   background: '#F7F7F9',
@@ -27,6 +29,7 @@ const colors = {
 };
 
 function TradingHomeScreen({ navigation }) {
+  const { isPro } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [quickRates, setQuickRates] = useState({
     usd: 0,
@@ -36,15 +39,13 @@ function TradingHomeScreen({ navigation }) {
     sp500: 0,
   });
 
-  const EXCHANGE_API_KEY = '7b0dd9209108c6604ede5f39';
-  const HG_API_KEY = 'f6ba5a2e';
+  const EXCHANGE_API_KEY = process.env.EXPO_PUBLIC_EXCHANGE_API_KEY;
+  const HG_API_KEY = process.env.EXPO_PUBLIC_HG_API_KEY;
 
-  // 🔹 Busca de cotações reais (ExchangeRateAPI + CoinGecko + HG Brasil)
   const fetchQuickRates = async () => {
     try {
       setLoading(true);
 
-      // 🟡 1. Cotações de moedas (base BRL)
       const fxResp = await fetch(
         `https://v6.exchangerate-api.com/v6/${EXCHANGE_API_KEY}/latest/BRL`
       );
@@ -57,14 +58,12 @@ function TradingHomeScreen({ navigation }) {
         ? 1 / fxJson.conversion_rates.EUR
         : 5.60;
 
-      // 🟣 2. Cotação de Bitcoin (CoinGecko)
       const cryptoResp = await fetch(
         'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl'
       );
       const cryptoJson = await cryptoResp.json();
       const btcRate = cryptoJson?.bitcoin?.brl ?? 175000;
 
-      // 🟢 3. Índices da Bolsa (HG Brasil)
       const hgResp = await fetch(
         `https://api.hgbrasil.com/finance?key=${HG_API_KEY}`
       );
@@ -88,17 +87,21 @@ function TradingHomeScreen({ navigation }) {
         btc: 175000,
         ibov: 126340,
         sp500: 4567,
-      }); // fallback
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!isPro) {
+      setLoading(false);
+      return;
+    }
     fetchQuickRates();
     const interval = setInterval(fetchQuickRates, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isPro]);
 
   const tradingOptions = [
     {
@@ -134,7 +137,6 @@ function TradingHomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primaryDark} />
@@ -144,7 +146,6 @@ function TradingHomeScreen({ navigation }) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Trading Options */}
         <View style={styles.optionsContainer}>
           {loading ? (
             <View style={styles.loadingBox}>
@@ -174,7 +175,6 @@ function TradingHomeScreen({ navigation }) {
           )}
         </View>
 
-        {/* Quick Actions */}
         <View style={styles.quickActionsContainer}>
           <Text style={styles.sectionTitle}>Ações Rápidas</Text>
 
