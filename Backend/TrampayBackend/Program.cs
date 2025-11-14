@@ -12,6 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 var services = builder.Services;
 
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
 builder.Services.AddHttpClient<AiService>();
 builder.Services.AddTransient<AiService>();
 // -----------------------------
@@ -37,6 +43,12 @@ var jwtSecret = configuration["Jwt:Secret"]
 var jwtIssuer = configuration["Jwt:Issuer"] ?? "Trampay";
 var jwtAudience = configuration["Jwt:Audience"] ?? "TrampayAudience";
 var keyBytes = Encoding.ASCII.GetBytes(jwtSecret);
+
+// Debug: Check Gemini API Key configuration
+var geminiKeyFromConfig = configuration["Ai:GeminiApiKey"];
+var geminiKeyFromEnv = Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+Console.WriteLine($"[INIT] Gemini API Key - Config: {(string.IsNullOrEmpty(geminiKeyFromConfig) ? "NOT SET" : "SET (len=" + geminiKeyFromConfig.Length + ")")}, Env: {(string.IsNullOrEmpty(geminiKeyFromEnv) ? "NOT SET" : "SET (len=" + geminiKeyFromEnv.Length + ")")}");
+
 
 services.AddAuthentication(options =>
 {
@@ -155,6 +167,19 @@ catch
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow }));
+app.MapGet("/health/gemini", (AiService aiService) => 
+{
+    var geminiKeyFromConfig = configuration["Ai:GeminiApiKey"];
+    var geminiKeyFromEnv = Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+    var hasKey = !string.IsNullOrEmpty(geminiKeyFromConfig) || !string.IsNullOrEmpty(geminiKeyFromEnv);
+    return Results.Ok(new { 
+        ok = hasKey, 
+        now = DateTime.UtcNow,
+        geminiConfigured = hasKey,
+        message = hasKey ? "Gemini API key is configured" : "Gemini API key is NOT configured - auto responses will be used"
+    });
+});
+
 
 // -----------------------------
 // Seed admin (opcional)

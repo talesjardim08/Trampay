@@ -14,11 +14,13 @@ namespace TrampayBackend.Controllers
     {
         private readonly AiService _aiService;
         private readonly IDbConnection _db;
+        private readonly ILogger<AiController> _logger;
 
-        public AiController(AiService aiService, IDbConnection db)
+        public AiController(AiService aiService, IDbConnection db, ILogger<AiController> logger)
         {
             _aiService = aiService;
             _db = db;
+            _logger = logger;
         }
 
         [Authorize]
@@ -68,6 +70,14 @@ namespace TrampayBackend.Controllers
 
                 // Call AI service to get response
                 var aiResponse = await _aiService.GetChatResponseAsync(request.Message);
+                if (aiResponse != null && aiResponse.StartsWith("[Resposta automática]"))
+                {
+                    _logger?.LogWarning("AiService returned automatic response for user {UserId} chat {ChatId}", userId, chatId);
+                }
+                else if (aiResponse != null && aiResponse.StartsWith("[Erro"))
+                {
+                    _logger?.LogWarning("AiService returned error-like response for user {UserId} chat {ChatId}: {Response}", userId, chatId, aiResponse);
+                }
 
                 // Save assistant response
                 await _db.ExecuteAsync(insertMsgSql, new { chatId, userId = (long?)null, role = "assistant", content = aiResponse, metadata = (string?)null });

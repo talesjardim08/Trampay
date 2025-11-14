@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -16,11 +17,13 @@ namespace TrampayBackend.Services
     {
         private readonly HttpClient _http;
         private readonly IConfiguration _config;
+        private readonly ILogger<AiService> _logger;
 
-        public AiService(HttpClient http, IConfiguration config)
+        public AiService(HttpClient http, IConfiguration config, ILogger<AiService> logger)
         {
             _http = http;
             _config = config;
+            _logger = logger;
         }
 
         public class ChatMessage
@@ -68,11 +71,20 @@ namespace TrampayBackend.Services
 
         public async Task<string> GetChatResponseAsync(string input)
         {
-            var geminiKey = _config["Ai:GeminiApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+            var geminiKey = _config["Ai:GeminiApiKey"] 
+                ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI")
+                ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
+            
+            Console.WriteLine($"[AiService.GetChatResponseAsync] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_API__KEY={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("API__KEY__GEMINI"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
+            
             if (string.IsNullOrEmpty(geminiKey))
             {
+                Console.WriteLine($"[AiService.GetChatResponseAsync] ⚠️ NO GEMINI KEY FOUND - returning automatic response");
+                _logger?.LogWarning("Gemini API key not configured - returning automatic response for input length {Length}", input?.Length ?? 0);
                 return $"[Resposta automática] Recebi: {input}";
             }
+            
+            Console.WriteLine($"[AiService.GetChatResponseAsync] ✅ Gemini key found (length={geminiKey.Length})");
 
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
             var payload = new
@@ -94,12 +106,16 @@ namespace TrampayBackend.Services
                 req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 req.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
+                _logger?.LogDebug("Sending request to Gemini endpoint. Url: {Url} - payload size: {Size} bytes", url, json?.Length ?? 0);
                 var res = await _http.SendAsync(req);
                 var body = await res.Content.ReadAsStringAsync();
                 var contentType = res.Content.Headers.ContentType?.MediaType ?? "";
+                Console.WriteLine($"[AiService.Gemini] Response: Status={(int)res.StatusCode}, ContentType={contentType}");
+                _logger?.LogDebug("Gemini response status: {Status}. Content-Type: {ContentType}. Body (truncated): {Body}", (int)res.StatusCode, contentType, (body ?? string.Empty).Length > 1000 ? (body ?? string.Empty).Substring(0, 1000) + "..." : body);
 
                 if (!res.IsSuccessStatusCode)
                 {
+                    Console.WriteLine($"[AiService.Gemini] ⚠️ Error response from Gemini: {(int)res.StatusCode}");
                     if (contentType.Contains("html") || body.TrimStart().StartsWith("<"))
                     {
                         var text = StripHtml(body);
@@ -150,6 +166,7 @@ namespace TrampayBackend.Services
                 }
                 catch (Exception ex)
                 {
+                    _logger?.LogError(ex, "Erro ao interpretar resposta do Gemini");
                     if (body.TrimStart().StartsWith("<"))
                     {
                         var text = StripHtml(body);
@@ -160,15 +177,23 @@ namespace TrampayBackend.Services
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, "Internal error while calling Gemini");
                 return $"[Erro interno] {ex.Message}";
             }
         }
 
         public async Task<string> GetChatResponseAsync(IList<ChatMessage> messages)
         {
-            var geminiKey = _config["Ai:GeminiApiKey"] ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+            var geminiKey = _config["Ai:GeminiApiKey"] 
+                ?? Environment.GetEnvironmentVariable("API__KEY__GEMINI")
+                ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
+            
+            Console.WriteLine($"[AiService.GetChatResponseAsync-History] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_API__KEY={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("API__KEY__GEMINI"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
+            
             if (string.IsNullOrEmpty(geminiKey))
             {
+                Console.WriteLine($"[AiService.GetChatResponseAsync-History] ⚠️ NO GEMINI KEY FOUND - returning automatic response");
+                _logger?.LogWarning("Gemini API key not configured - returning automatic response for chat messages count {Count}", messages?.Count ?? 0);
                 if (messages != null && messages.Count > 0)
                 {
                     var last = messages[messages.Count - 1].content;
@@ -176,6 +201,8 @@ namespace TrampayBackend.Services
                 }
                 return "[Resposta automática]";
             }
+            
+            Console.WriteLine($"[AiService.GetChatResponseAsync-History] ✅ Gemini key found (length={geminiKey.Length})");
 
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
             
@@ -200,9 +227,11 @@ namespace TrampayBackend.Services
                 req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 req.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
+                _logger?.LogDebug("Sending chat history to Gemini endpoint. Url: {Url} - payload size: {Size} bytes - messages: {Count}", url, json?.Length ?? 0, messages?.Count ?? 0);
                 var res = await _http.SendAsync(req);
                 var body = await res.Content.ReadAsStringAsync();
                 var contentType = res.Content.Headers.ContentType?.MediaType ?? "";
+                _logger?.LogDebug("Gemini response status: {Status}. Content-Type: {ContentType}. Body (truncated): {Body}", (int)res.StatusCode, contentType, (body ?? string.Empty).Length > 1000 ? (body ?? string.Empty).Substring(0, 1000) + "..." : body);
 
                 if (!res.IsSuccessStatusCode)
                 {
@@ -256,6 +285,7 @@ namespace TrampayBackend.Services
                 }
                 catch (Exception ex)
                 {
+                    _logger?.LogError(ex, "Erro ao interpretar resposta do Gemini");
                     if (body.TrimStart().StartsWith("<"))
                     {
                         var text = StripHtml(body);
@@ -266,6 +296,7 @@ namespace TrampayBackend.Services
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, "Internal error while calling Gemini");
                 return $"[Erro interno] {ex.Message}";
             }
         }

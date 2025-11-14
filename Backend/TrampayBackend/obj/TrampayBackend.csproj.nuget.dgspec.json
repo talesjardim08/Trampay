@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/home/runner/workspace/Backend/TrampayBackend/TrampayBackend.csproj": {}
+    "/workspaces/Trampay/Backend/TrampayBackend/TrampayBackend.csproj": {}
   },
   "projects": {
-    "/home/runner/workspace/Backend/TrampayBackend/TrampayBackend.csproj": {
+    "/workspaces/Trampay/Backend/TrampayBackend/TrampayBackend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/runner/workspace/Backend/TrampayBackend/TrampayBackend.csproj",
+        "projectUniqueName": "/workspaces/Trampay/Backend/TrampayBackend/TrampayBackend.csproj",
         "projectName": "TrampayBackend",
-        "projectPath": "/home/runner/workspace/Backend/TrampayBackend/TrampayBackend.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/home/runner/workspace/Backend/TrampayBackend/obj/",
+        "projectPath": "/workspaces/Trampay/Backend/TrampayBackend/TrampayBackend.csproj",
+        "packagesPath": "/home/codespace/.nuget/packages/",
+        "outputPath": "/workspaces/Trampay/Backend/TrampayBackend/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/home/codespace/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -91,7 +91,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/nix/store/xd9xy9mf4wmmlcdk51kzvsrnazqsajfz-dotnet-sdk-8.0.412/share/dotnet/sdk/8.0.412/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.415/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
