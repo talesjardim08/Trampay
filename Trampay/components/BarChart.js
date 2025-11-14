@@ -34,10 +34,22 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
   }
 
   const maxValue = Math.max(...normalizedData.map(d => d.displayValue));
-  const minBarWidth = 40;
-  const barSpacing = 15;
-  const calculatedBarWidth = Math.max(minBarWidth, (chartWidth / normalizedData.length) - barSpacing);
-  const barWidth = Math.min(calculatedBarWidth, chartWidth / normalizedData.length - 5);
+  
+  // Calcula a largura das barras garantindo que todas caibam no gráfico
+  const dataLength = normalizedData.length;
+  const barSpacing = 10;
+  const minBarWidth = 20;
+  const maxBarWidth = 80;
+  
+  // Espaço total disponível para barras = chartWidth - espaços entre barras
+  const totalSpacing = barSpacing * (dataLength + 1);
+  const availableWidth = chartWidth - totalSpacing;
+  
+  // Largura de cada barra = espaço disponível dividido pelo número de barras
+  let barWidth = availableWidth / dataLength;
+  
+  // Limita a largura entre min e max
+  barWidth = Math.max(minBarWidth, Math.min(maxBarWidth, barWidth));
 
   // Formata valores em reais
   const formatCurrency = (value) => {
