@@ -17,12 +17,13 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
   const chartWidth = Math.max(0, width - padding.left - padding.right);
   const chartHeight = Math.max(0, height - padding.top - padding.bottom);
 
-  // Normaliza os dados
+  // Normaliza os dados - usa valores absolutos para o gráfico
   const normalizedData = data.map(item => ({
     label: item.label || item.category || 'Sem nome',
     value: Number(item.value) || Number(item.total) || 0,
+    displayValue: Math.abs(Number(item.value) || Number(item.total) || 0),
     color: item.color || colors.primary
-  })).filter(item => item.value > 0);
+  })).filter(item => item.displayValue > 0);
 
   if (normalizedData.length === 0) {
     return (
@@ -32,9 +33,11 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
     );
   }
 
-  const maxValue = Math.max(...normalizedData.map(d => d.value));
-  const barWidth = chartWidth / normalizedData.length - 10;
-  const barSpacing = 10;
+  const maxValue = Math.max(...normalizedData.map(d => d.displayValue));
+  const minBarWidth = 40;
+  const barSpacing = 15;
+  const calculatedBarWidth = Math.max(minBarWidth, (chartWidth / normalizedData.length) - barSpacing);
+  const barWidth = Math.min(calculatedBarWidth, chartWidth / normalizedData.length - 5);
 
   // Formata valores em reais
   const formatCurrency = (value) => {
@@ -99,7 +102,7 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
 
         {/* Barras */}
         {normalizedData.map((item, index) => {
-          const barHeight = (item.value / maxValue) * chartHeight;
+          const barHeight = (item.displayValue / maxValue) * chartHeight;
           const x = padding.left + index * (barWidth + barSpacing) + barSpacing / 2;
           const y = padding.top + chartHeight - barHeight;
 
@@ -125,7 +128,7 @@ const BarChart = ({ data, width = 350, height = 250, showLegend = true }) => {
                 textAnchor="middle"
                 fontWeight="bold"
               >
-                {formatCurrency(item.value)}
+                {formatCurrency(item.displayValue)}
               </SvgText>
 
               {/* Rótulo no eixo X */}
