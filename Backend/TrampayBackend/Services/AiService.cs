@@ -71,9 +71,8 @@ namespace TrampayBackend.Services
 
         public async Task<string> GetChatResponseAsync(string input)
         {
-            var geminiKey = _config["Ai:GeminiApiKey"] 
-                ?? Environment.GetEnvironmentVariable("api__key__gemini")
-                ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
+            var geminiKey = !string.IsNullOrEmpty(_config["Ai:GeminiApiKey"]) ? _config["Ai:GeminiApiKey"] :
+                Environment.GetEnvironmentVariable("api__key__gemini") ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
             
             Console.WriteLine($"[AiService.GetChatResponseAsync] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_api__key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("api__key__gemini"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
             
@@ -86,7 +85,7 @@ namespace TrampayBackend.Services
             
             Console.WriteLine($"[AiService.GetChatResponseAsync] ✅ Gemini key found (length={geminiKey.Length})");
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiKey}";
             var payload = new
             {
                 contents = new[]
@@ -184,9 +183,8 @@ namespace TrampayBackend.Services
 
         public async Task<string> GetChatResponseAsync(IList<ChatMessage> messages)
         {
-            var geminiKey = _config["Ai:GeminiApiKey"] 
-                ?? Environment.GetEnvironmentVariable("api__key__gemini")
-                ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
+            var geminiKey = !string.IsNullOrEmpty(_config["Ai:GeminiApiKey"]) ? _config["Ai:GeminiApiKey"] :
+                Environment.GetEnvironmentVariable("api__key__gemini") ?? Environment.GetEnvironmentVariable("Ai__GeminiApiKey");
             
             Console.WriteLine($"[AiService.GetChatResponseAsync-History] Checking Gemini key: Config={!string.IsNullOrEmpty(_config["Ai:GeminiApiKey"])}, Env_api__key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("api__key__gemini"))}, Env_Ai__Key={!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("Ai__GeminiApiKey"))}, Final={!string.IsNullOrEmpty(geminiKey)}");
             
@@ -204,7 +202,7 @@ namespace TrampayBackend.Services
             
             Console.WriteLine($"[AiService.GetChatResponseAsync-History] ✅ Gemini key found (length={geminiKey.Length})");
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={geminiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiKey}";
             
             // Convert chat history to Gemini format
             var contents = new List<object>();

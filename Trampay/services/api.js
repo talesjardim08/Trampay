@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://trampay.onrender.com/api';
+console.log('[API] BASE URL =', API_BASE);
 const api = axios.create({ baseURL: API_BASE, timeout: 30000 });
 api.interceptors.request.use(
   async (config) => {

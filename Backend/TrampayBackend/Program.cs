@@ -8,6 +8,26 @@ using TrampayBackend.Middleware;
 using Microsoft.Extensions.FileProviders;
 using TrampayBackend.Services;
 
+var baseDir = Directory.GetCurrentDirectory();
+foreach (var envFileName in new[] { ".env.local", ".env" })
+{
+    var envPath = Path.Combine(baseDir, envFileName);
+    if (!File.Exists(envPath)) continue;
+
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+        var trimmed = line.Trim();
+        if (trimmed.StartsWith("#")) continue;
+        var idx = trimmed.IndexOf('=');
+        if (idx <= 0) continue;
+        var key = trimmed.Substring(0, idx).Trim();
+        var value = trimmed[(idx + 1)..].Trim();
+        if (key.Length == 0) continue;
+        Environment.SetEnvironmentVariable(key, value);
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 var services = builder.Services;
@@ -46,7 +66,7 @@ var keyBytes = Encoding.ASCII.GetBytes(jwtSecret);
 
 // Debug: Check Gemini API Key configuration
 var geminiKeyFromConfig = configuration["Ai:GeminiApiKey"];
-var geminiKeyFromEnv = Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+var geminiKeyFromEnv = Environment.GetEnvironmentVariable("api__key__gemini");
 Console.WriteLine($"[INIT] Gemini API Key - Config: {(string.IsNullOrEmpty(geminiKeyFromConfig) ? "NOT SET" : "SET (len=" + geminiKeyFromConfig.Length + ")")}, Env: {(string.IsNullOrEmpty(geminiKeyFromEnv) ? "NOT SET" : "SET (len=" + geminiKeyFromEnv.Length + ")")}");
 
 
@@ -170,7 +190,7 @@ app.MapGet("/health", () => Results.Ok(new { ok = true, now = DateTime.UtcNow })
 app.MapGet("/health/gemini", (AiService aiService) => 
 {
     var geminiKeyFromConfig = configuration["Ai:GeminiApiKey"];
-    var geminiKeyFromEnv = Environment.GetEnvironmentVariable("API__KEY__GEMINI");
+    var geminiKeyFromEnv = Environment.GetEnvironmentVariable("api__key__gemini");
     var hasKey = !string.IsNullOrEmpty(geminiKeyFromConfig) || !string.IsNullOrEmpty(geminiKeyFromEnv);
     return Results.Ok(new { 
         ok = hasKey, 

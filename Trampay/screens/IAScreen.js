@@ -13,7 +13,9 @@ import {
   Modal,
   Pressable,
   Clipboard,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  SafeAreaView,
+  StatusBar
 } from "react-native";
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from "../styles";
@@ -233,8 +235,9 @@ export default function IAScreen({ navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
+        <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
@@ -331,13 +334,15 @@ export default function IAScreen({ navigation }) {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: colors.background },
   containerBlocked: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md, backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md, backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
   backButton: { padding: spacing.xs },
   title: { fontSize: 20, fontFamily: fonts.bold, color: colors.text },
   headerActions: { flexDirection: "row", gap: spacing.sm },
@@ -374,8 +379,8 @@ const styles = StyleSheet.create({
   typingRow: { flexDirection: "row", alignItems: "center", padding: 8, marginTop: 4 },
   typingText: { marginLeft: 8, color: colors.textLight },
 
-  inputContainer: { flexDirection: "row", padding: spacing.sm, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginRight: spacing.sm, maxHeight: 120, color: colors.text, backgroundColor: colors.white },
+  inputContainer: { flexDirection: "row", paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: Platform.OS === "ios" ? spacing.sm : 0 },
+  input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginRight: spacing.sm, maxHeight: 100, minHeight: 44, color: colors.text, backgroundColor: colors.white, textAlignVertical: "top" },
   sendButton: { backgroundColor: colors.primary, borderRadius: borderRadius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, justifyContent: "center", alignItems: "center" },
   sendButtonText: { color: colors.white, fontFamily: fonts.bold },
 
