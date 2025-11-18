@@ -50,3 +50,6 @@ export async function updateBalance(balance, currency = 'BRL') {
     return { success: false, error: err };
   }
 }
+
+
+//rgfdgd

@@ -29,7 +29,7 @@
       "code": "NU1603",
       "level": "Warning",
       "warningLevel": 1,
-      "message": "TrampayBackend depends on Dapper (>= 2.1.0) but Dapper 2.1.0 was not found. An approximate best match of Dapper 2.1.1 was resolved.",
+      "message": "TrampayBackend depende de Dapper (>= 2.1.0), mas Dapper 2.1.0 não foi encontrado. A melhor correspondência aproximada de Dapper 2.1.1 foi resolvida.",
       "libraryId": "Dapper",
       "targetGraphs": [
         "net8.0"
