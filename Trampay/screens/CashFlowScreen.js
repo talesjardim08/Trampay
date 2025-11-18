@@ -1,5 +1,5 @@
 // Tela do Fluxo de Caixa - Trampay
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   TextInput,
   Alert,
   Dimensions,
-  Modal
+  Modal,
+  RefreshControl // Importante para atualizar o saldo manualmente
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,6 +36,7 @@ const CashFlowScreen = ({ navigation }) => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [transactionDetailsVisible, setTransactionDetailsVisible] = useState(false);
   const [cashflowData, setCashflowData] = useState([]);
+  const [refreshing, setRefreshing] = useState(false); // Estado para o refresh control
 
   // Chaves de armazenamento
   const TRANSACTIONS_STORAGE_KEY = 'trampay_transactions';
@@ -42,38 +44,76 @@ const CashFlowScreen = ({ navigation }) => {
 
   // Carregar dados iniciais
   useEffect(() => {
-    loadTransactions();
-    loadBalance();
-    (async () => { try { await SecureStorage.migrateExistingData(TRANSACTIONS_STORAGE_KEY); } catch {} })();
-    (async () => {
-      try {
-        const serverBalance = await fetchBalance('BRL');
-        if (typeof serverBalance === 'number') {
-          await saveBalance(serverBalance);
-        }
-        const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
-        if (resp?.data && Array.isArray(resp.data)) {
-          setCashflowData(resp.data);
-        }
-      } catch (err) {}
-    })();
+    loadInitialData();
+
+    // Listeners de eventos
+    const unsubBalance = on(Events.BalanceUpdated, (val) => {
+      if (typeof val === 'number') setBalance(val);
+    });
+    const unsubTx = on(Events.TransactionsUpdated, (list) => {
+      if (Array.isArray(list)) setTransactions(list);
+    });
+
+    return () => { unsubBalance(); unsubTx(); };
   }, []);
 
   // Recarrega dados do gráfico ao trocar período
   useEffect(() => {
-    (async () => {
-      try {
-        const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
-        if (resp?.data && Array.isArray(resp.data)) {
-          setCashflowData(resp.data);
-        }
-      } catch (err) {}
-    })();
+    fetchChartData();
   }, [periodTab]);
+
+  const loadInitialData = async () => {
+    await loadTransactions();
+    await loadBalanceLocal(); // Carrega cache primeiro
+    await syncBalanceFromServer(); // Depois tenta buscar do servidor
+    await fetchChartData();
+  };
+
+  // Função de Refresh (Puxar para baixo)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      syncBalanceFromServer(),
+      fetchChartData(),
+      // Opcional: Recarregar transações do servidor se houver endpoint para isso
+    ]);
+    setRefreshing(false);
+  }, [periodTab]);
+
+  const fetchChartData = async () => {
+    try {
+      const resp = await api.get('/analytics/cashflow', { params: { period: periodTab === 'weekly' ? 'week' : 'month' } });
+      if (resp?.data && Array.isArray(resp.data)) {
+        setCashflowData(resp.data);
+      }
+    } catch (err) {
+      // Silently fail or log
+      console.log("Erro ao buscar dados do gráfico:", err.message);
+    }
+  };
+
+  // Sincronizar saldo com o servidor
+  const syncBalanceFromServer = async () => {
+    try {
+      const serverBalance = await fetchBalance('BRL');
+      // Só atualiza se o retorno for um número válido (não null)
+      if (serverBalance !== null && typeof serverBalance === 'number') {
+        console.log('Atualizando saldo local com dados do servidor:', serverBalance);
+        await saveBalance(serverBalance);
+      } else {
+        console.log('Falha ao buscar saldo ou saldo nulo, mantendo local.');
+      }
+    } catch (err) {
+      console.error('Erro na sincronização de saldo:', err);
+    }
+  };
 
   // Carregar transações
   const loadTransactions = async () => {
     try {
+      // Tenta migrar dados antigos se necessário
+      await SecureStorage.migrateExistingData(TRANSACTIONS_STORAGE_KEY).catch(() => {});
+      
       const stored = await SecureStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (stored) {
         const transactionsList = Array.isArray(stored) ? stored : [];
@@ -85,15 +125,15 @@ const CashFlowScreen = ({ navigation }) => {
     }
   };
 
-  // Carregar saldo
-  const loadBalance = async () => {
+  // Carregar saldo localmente
+  const loadBalanceLocal = async () => {
     try {
       const stored = await SecureStorage.getItem(BALANCE_STORAGE_KEY);
       if (stored !== null && stored !== undefined) {
         setBalance(parseFloat(stored));
       }
     } catch (error) {
-      console.error('Erro ao carregar saldo:', error);
+      console.error('Erro ao carregar saldo local:', error);
     }
   };
 
@@ -113,9 +153,12 @@ const CashFlowScreen = ({ navigation }) => {
   // Salvar saldo
   const saveBalance = async (newBalance) => {
     try {
-      await SecureStorage.setItem(BALANCE_STORAGE_KEY, newBalance);
-      setBalance(newBalance);
-      emit(Events.BalanceUpdated, newBalance);
+      const val = parseFloat(newBalance);
+      if (isNaN(val)) return;
+      
+      await SecureStorage.setItem(BALANCE_STORAGE_KEY, val);
+      setBalance(val);
+      emit(Events.BalanceUpdated, val);
     } catch (error) {
       console.error('Erro ao salvar saldo:', error);
     }
@@ -138,9 +181,13 @@ const CashFlowScreen = ({ navigation }) => {
 
     // Atualizar saldo apenas se a transação não for recorrente E for da moeda base (tratando undefined como BRL)
     if (!transactionData.isRecurring && (transactionData.currency || 'BRL') === baseCurrency) {
+      const currentBal = isNaN(balance) ? 0 : balance;
+      const amount = parseFloat(transactionData.amount) || 0;
+      
       const newBalance = transactionData.type === 'income' 
-        ? balance + transactionData.amount 
-        : balance - transactionData.amount;
+        ? currentBal + amount 
+        : currentBal - amount;
+        
       await saveBalance(newBalance);
     } else if ((transactionData.currency || 'BRL') !== baseCurrency) {
       Alert.alert(
@@ -151,16 +198,6 @@ const CashFlowScreen = ({ navigation }) => {
 
     setAddTransactionVisible(false);
   };
-
-  useEffect(() => {
-    const unsubBalance = on(Events.BalanceUpdated, (val) => {
-      if (typeof val === 'number') setBalance(val);
-    });
-    const unsubTx = on(Events.TransactionsUpdated, (list) => {
-      if (Array.isArray(list)) setTransactions(list);
-    });
-    return () => { unsubBalance(); unsubTx(); };
-  }, []);
 
   // Calcular resumo financeiro
   const getFinancialSummary = () => {
@@ -211,26 +248,22 @@ const CashFlowScreen = ({ navigation }) => {
     transaction.category?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calcular previsão financeira (incluindo agendadas e recorrentes)
+  // Calcular previsão financeira
   const getFinancialForecast = () => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Zerar horas para comparação precisa
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
 
     const getForecastForPeriod = (startDate, endDate) => {
       const periodTransactions = transactions.filter(transaction => {
-        // Use transactionDate (ISO) se disponível, senão use createdAt
         const dateToUse = transaction.transactionDate || transaction.createdAt;
         const transactionDate = new Date(dateToUse);
-        transactionDate.setHours(0, 0, 0, 0); // Zerar horas para comparação precisa
+        transactionDate.setHours(0, 0, 0, 0);
         
-        // Verificar se a data é válida
         if (isNaN(transactionDate.getTime())) {
           return false;
         }
         
-        // Incluir transações agendadas (status !== 'concluído') e transações concluídas
-        // Filtrar por período e moeda BRL
         return transactionDate >= startDate && transactionDate <= endDate && 
                (transaction.currency === 'BRL' || !transaction.currency);
       });
@@ -246,7 +279,6 @@ const CashFlowScreen = ({ navigation }) => {
       return { income, expenses };
     };
 
-    // Para "future", incluir próximos 7 dias a partir de amanhã
     const futureEndDate = new Date(tomorrow.getTime() + (6 * 24 * 60 * 60 * 1000));
 
     return {
@@ -273,7 +305,13 @@ const CashFlowScreen = ({ navigation }) => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primaryDark]} />
+        }
+      >
         {/* Adicionar Entrada/Saída Button */}
         <TouchableOpacity
           style={styles.addTransactionButton}
@@ -285,7 +323,9 @@ const CashFlowScreen = ({ navigation }) => {
 
         {/* Saldo em mãos */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceAmount}>R${balance.toFixed(2).replace('.', ',')}</Text>
+          <Text style={styles.balanceAmount}>
+            R${(typeof balance === 'number' ? balance : 0).toFixed(2).replace('.', ',')}
+          </Text>
           <Text style={styles.balanceLabel}>Saldo em mãos</Text>
         </View>
 
