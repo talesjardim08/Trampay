@@ -831,69 +831,6 @@ const HomeScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Chart Section */}
-            <View style={styles.chartSection}>
-              <Text style={styles.chartTitle}>Gráfico de despesas x receita</Text>
-
-              {/* Chart Period Filters */}
-              <View style={styles.chartFilters}>
-                {['Hoje', 'Esta semana', 'Este Mês'].map((period) => (
-                  <TouchableOpacity
-                    key={period}
-                    style={[styles.chartFilter, chartPeriod === period && styles.activeChartFilter]}
-                    onPress={() => setChartPeriod(period)}
-                  >
-                    <Text style={[styles.chartFilterText, chartPeriod === period && styles.activeChartFilterText]}>
-                      {period}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Chart Values */}
-              <View style={styles.chartValues}>
-                <View style={styles.chartValueItem}>
-                  <Text style={styles.chartValueLabel}>Despesas</Text>
-                  <Text style={styles.expenseValue}>R${expenses.toFixed(2)}</Text>
-                </View>
-                <View style={styles.chartValueItem}>
-                  <Text style={styles.chartValueLabel}>Receitas</Text>
-                  <Text style={styles.incomeValue}>R${income.toFixed(2)}</Text>
-                </View>
-              </View>
-
-              {/* Interactive Chart */}
-              <View style={styles.chartContainer}>
-                <View style={styles.chartBar}>
-                  <View
-                    style={[
-                      styles.chartBarIncome,
-                      { height: income + expenses > 0 ? Math.max((income / (income + expenses)) * 100, 10) : 10 }
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.chartBarExpense,
-                      { height: income + expenses > 0 ? Math.max((expenses / (income + expenses)) * 100, 10) : 10 }
-                    ]}
-                  />
-                </View>
-
-                <View style={styles.chartLegend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, { backgroundColor: colors.success }]} />
-                    <Text style={styles.legendText}>Receitas</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, { backgroundColor: colors.error }]} />
-                    <Text style={styles.legendText}>Despesas</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </>
-        )}
-
         {activeTab === 'Agenda' && (
           <View style={styles.agendaContainer}>
             {/* Agenda Header */}
@@ -2274,3 +2211,4 @@ const styles = StyleSheet.create({
 
 export default HomeScreen;
 import { on, Events } from './utils/EventBus';
+
