@@ -1,8 +1,3 @@
-// Tela Home do Trampay com Dashboard completo (integrada com backend + cache)
-// Mantive 100% dos imports, estrutura visual e estilos originais — só adicionei
-// a lógica de integração com a API (GET /auth/me, GET/POST /transactions),
-// sincronização com AsyncStorage/AsyncStorage, tratamento de erros e logs detalhados.
-
 import React, { useState, useEffect, useContext } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -20,7 +15,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Removed AsyncStorage import - using AsyncStorage for all storage
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import api from './services/api';
 import { getUserProfile } from './authService';
@@ -30,6 +24,7 @@ import { colors, fonts, spacing } from './styles';
 import TransactionModal from './components/TransactionModal';
 import SideMenu from './components/SideMenu';
 import { AuthContext } from './AuthContext';
+import { on, Events } from './utils/EventBus';
 
 const { width } = Dimensions.get('window');
 
@@ -61,14 +56,14 @@ const HomeScreen = ({ navigation, route }) => {
     description: '',
     date: '',
     time: '',
-    type: 'meeting', // meeting, payment, deadline, appointment, reminder
+    type: 'meeting',
     client: '',
     amount: '',
-    priority: 'medium', // low, medium, high
+    priority: 'medium',
     location: '',
-    reminder: '15', // minutes before
+    reminder: '15',
     recurring: false,
-    frequency: 'none' // none, daily, weekly, monthly
+    frequency: 'none'
   });
 
   // Loading / sync states
@@ -77,19 +72,12 @@ const HomeScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Chaves de armazenamento compartilhadas com CashFlowScreen
+  // Chaves de armazenamento
   const TRANSACTIONS_STORAGE_KEY = 'trampay_transactions';
-  // const BALANCE_STORAGE_KEY = "trampay_balance"; // Removido - agora usa backend
   const EVENTS_STORAGE_KEY = 'userEvents';
-  const OUTBOX_STORAGE_KEY = 'trampay_transactions_outbox'; // transações locais pendentes de sync
+  const OUTBOX_STORAGE_KEY = 'trampay_transactions_outbox';
 
-  // Nome de usuário para exibição (mantendo comportamento original)
   const userName = (currentUser?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Usuário').toString();
-
-  // API client (local) — insere token automaticamente a partir do AsyncStorage
-
-  // --- Helper: persist e read utilities (AsyncStorage + AsyncStorage) ---
-
 
   const saveAsyncData = async (key, data) => {
     try {
@@ -109,61 +97,85 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Core: Load data (cache first, then try server) ---
-  const loadSavedData = async () => {
-    setError(null);
-    try {
-      // Carrega transações locais (cache)
+ const loadSavedData = async () => {
+  setError(null);
+  try {
+    // 1. Primeiro, sempre busca dados do servidor
+    console.log('[Home] Buscando dados do servidor...');
+    
+    // Busca saldo do backend
+    const serverBalance = await fetchBalance('BRL');
+    if (serverBalance !== null) {
+      setBalance(serverBalance);
+      console.log('[Home] Saldo carregado do servidor:', serverBalance);
+    }
+    
+    // Busca transações do backend
+    const serverTransactions = await fetchTransactionsFromServer();
+    if (serverTransactions && Array.isArray(serverTransactions)) {
+      // Normaliza transações
+      const normalized = serverTransactions.map((r) => ({
+        id: r.id?.toString() || (r._id ? r._id.toString() : undefined),
+        description: r.title || r.description || r.name,
+        amount: parseFloat(r.amount) || 0,
+        type: r.type || (r.amount >= 0 ? 'income' : 'expense'),
+        currency: r.currency || 'BRL',
+        transactionDate: r.transaction_date || r.transactionDate || r.createdAt || new Date().toISOString(),
+        createdAt: r.created_at || r.createdAt || r.transactionDate || new Date().toISOString(),
+        status: r.status || 'concluído',
+        category: r.category || r.tags || 'Variável',
+        metadata: r.metadata || {},
+      }));
+      
+      setUserTransactions(normalized);
+      await saveAsyncData(TRANSACTIONS_STORAGE_KEY, normalized);
+      console.log('[Home] Transações carregadas do servidor:', normalized.length);
+    }
+    
+    // 2. Se falhou, tenta carregar do cache local
+    if (!serverTransactions) {
+      console.log('[Home] Servidor indisponível, carregando do cache local...');
       const savedTransactions = await loadAsyncData(TRANSACTIONS_STORAGE_KEY);
       if (savedTransactions) {
-        console.log('[Home] carregando transações do AsyncStorage (cache). Quantidade:', savedTransactions.length);
         setUserTransactions(savedTransactions);
-      } else {
-        console.log('[Home] sem transações locais no AsyncStorage.');
       }
-
-      // Busca saldo do backend (não usa mais AsyncStorage)
-      const serverBalance = await fetchBalance('BRL');
-      if (serverBalance !== null) {
-        setBalance(serverBalance);
-        console.log('[Home] saldo carregado do servidor:', serverBalance);
-      }
-
-      // Carrega eventos do AsyncStorage
-      const savedEvents = await loadAsyncData(EVENTS_STORAGE_KEY);
-      if (savedEvents) {
-        setEvents(savedEvents);
-        console.log('[Home] eventos carregados do AsyncStorage:', savedEvents.length);
-      }
-
-    } catch (err) {
-      console.error('[Home] erro ao carregar dados locais:', err);
-      setError('Erro ao carregar dados locais.');
-    } finally {
     }
-  };
 
-  // --- Load analytics data from backend
-  const loadAnalyticsData = async () => {
-    try {
-      const [summary, expensesByCategory, revenueByCategory] = await Promise.all([
-        fetchAnalyticsSummary(),
-        fetchExpensesByCategory(),
-        fetchRevenueByCategory()
-      ]);
-      
-      console.log('[Home] Analytics carregados do backend:', { summary, expensesByCategory, revenueByCategory });
-      
-      // Pode usar esses dados para atualizar o estado dos gráficos/cards se necessário
-      // Por hora apenas logamos para confirmar que funciona
-      return { summary, expensesByCategory, revenueByCategory };
-    } catch (error) {
-      console.error('[Home] Erro ao carregar analytics:', error);
-      return null;
+    // Carrega eventos do AsyncStorage (mantém local)
+    const savedEvents = await loadAsyncData(EVENTS_STORAGE_KEY);
+    if (savedEvents) {
+      setEvents(savedEvents);
     }
-  };
 
-  // --- Fetch profile from backend
+  } catch (err) {
+    console.error('[Home] erro ao carregar dados:', err);
+    setError('Erro ao carregar dados.');
+  }
+};
+
+ const loadAnalyticsData = async () => {
+  try {
+    const summary = await fetchAnalyticsSummary();
+    
+    if (summary) {
+      console.log('[Home] Analytics carregados:', summary);
+      
+      // Atualizar saldo se disponível no summary
+      if (summary.balance !== undefined) {
+        setBalance(parseFloat(summary.balance) || 0);
+      }
+      
+      // Retorna os dados para uso nos gráficos
+      return summary;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[Home] Erro ao carregar analytics:', error);
+    return null;
+  }
+};
+
   const fetchProfileFromServer = async () => {
     try {
       const profile = await getUserProfile();
@@ -191,19 +203,49 @@ const HomeScreen = ({ navigation, route }) => {
   );
 
   useEffect(() => {
-    const unsubBalance = on(Events.BalanceUpdated, (val) => {
-      if (typeof val === 'number') setBalance(val);
-    });
-    const unsubTx = on(Events.TransactionsUpdated, (list) => {
-      if (Array.isArray(list)) setUserTransactions(list);
-    });
-    return () => { unsubBalance(); unsubTx(); };
-  }, []);
+  let mounted = true;
+  (async () => {
+    setLoading(true);
+    try {
+      // 1. Carrega dados principais
+      await loadSavedData();
+      
+      // 2. Carrega analytics (inclui saldo calculado)
+      const analytics = await loadAnalyticsData();
+      
+      // 3. Tenta sincronizar outbox (transações pendentes)
+      await flushOutbox();
+      
+      console.log('[Home] Inicialização completa');
+    } catch (err) {
+      console.error('[Home] Erro na inicialização:', err);
+      setError('Erro ao carregar dados. Tente novamente.');
+    } finally {
+      if (mounted) setLoading(false);
+    }
+  })();
 
-  // --- Fetch transactions from backend
+  // Polling opcional para manter dados atualizados
+  const interval = setInterval(async () => {
+    try {
+      await flushOutbox();
+      const serverBalance = await fetchBalance('BRL');
+      if (serverBalance !== null && mounted) {
+        setBalance(serverBalance);
+      }
+    } catch (e) {
+      console.warn('[Home] Erro no polling:', e);
+    }
+  }, 5 * 60 * 1000); // A cada 5 minutos
+
+  return () => {
+    mounted = false;
+    clearInterval(interval);
+  };
+}, []);
+
   const fetchTransactionsFromServer = async (params = {}) => {
     try {
-      // envia query params se houver
       const resp = await api.get('/transactions', { params });
       if (resp?.data) {
         console.log('[Home] transações obtidas do servidor:', resp.data.length);
@@ -216,20 +258,17 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Post transaction to server
   const postTransactionToServer = async (transaction) => {
     try {
       const payload = {
-        // mantém a estrutura mínima esperada — ajuste campo a campo conforme backend
         title: transaction.description || transaction.name || 'Transação',
         amount: transaction.amount,
-        type: transaction.type // 'income'|'expense'
-        ,
+        type: transaction.type,
         currency: transaction.currency || 'BRL',
         transactionDate: transaction.transactionDate || transaction.createdAt,
         category: transaction.category || 'Sem categoria',
         status: transaction.status || 'concluído',
-        metadata: transaction.metadata || {},
+        metadata: JSON.stringify(transaction.metadata || {}),
       };
 
       const resp = await api.post('/transactions', payload);
@@ -241,7 +280,6 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Outbox pattern: guarda transações locais que falharam no envio
   const addToOutbox = async (transaction) => {
     try {
       const outbox = (await loadAsyncData(OUTBOX_STORAGE_KEY)) || [];
@@ -270,20 +308,16 @@ const HomeScreen = ({ navigation, route }) => {
       for (const tx of outbox) {
         const res = await postTransactionToServer(tx);
         if (res.success) {
-          successful.push(res.data || tx); // se servidor retornou objeto atualizado use-o
+          successful.push(res.data || tx);
         } else {
           failed.push(tx);
         }
       }
 
-      // Atualiza outbox com os falhos
       await saveAsyncData(OUTBOX_STORAGE_KEY, failed);
 
-      // Se tiver transações bem-sucedidas, atualiza cache local para refletir IDs do servidor
       if (successful.length) {
         const local = (await loadAsyncData(TRANSACTIONS_STORAGE_KEY)) || [];
-        // Merge: substitui itens locais por itens retornados pelo servidor se IDs coincidirem por algum campo
-        // Aqui fazemos append seguro
         const merged = [...local, ...successful];
         await saveAsyncData(TRANSACTIONS_STORAGE_KEY, merged);
         setUserTransactions(merged);
@@ -296,7 +330,6 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Reconcile server <-> local (fetch remoto e substituir/merge local se disponível)
   const syncFromServer = async () => {
     setSyncing(true);
     try {
@@ -307,21 +340,19 @@ const HomeScreen = ({ navigation, route }) => {
         return;
       }
 
-      // Normalize remote items to expected local shape (tenta preservar campos locais)
       const normalized = (remote || []).map((r) => ({
         id: r.id?.toString() || (r._id ? r._id.toString() : undefined),
         description: r.title || r.description || r.name,
         amount: parseFloat(r.amount) || 0,
         type: r.type || (r.amount >= 0 ? 'income' : 'expense'),
         currency: r.currency || 'BRL',
-        transactionDate: r.transactionDate || r.createdAt || new Date().toISOString(),
-        createdAt: r.createdAt || r.transactionDate || new Date().toISOString(),
+        transactionDate: r.transaction_date || r.transactionDate || r.created_at || new Date().toISOString(),
+        createdAt: r.created_at || r.transactionDate || new Date().toISOString(),
         status: r.status || 'concluído',
         category: r.category || r.tags || 'Variável',
         metadata: r.metadata || {},
       }));
 
-      // Salva no AsyncStorage (substitui cache local pelos dados remotos)
       await saveAsyncData(TRANSACTIONS_STORAGE_KEY, normalized);
       setUserTransactions(normalized);
       console.log('[Home] syncFromServer — cache atualizado com dados remotos. Total:', normalized.length);
@@ -333,27 +364,18 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Inicialização: carrega dados locais primeiro, tenta buscar do servidor, então flush outbox
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        await loadSavedData(); // carrega cache primeiro (rápido)
-        // tenta buscar perfil remotos e transações
+        await loadSavedData();
         const profile = await fetchProfileFromServer();
         if (profile && mounted) {
-          // se houver perfil remoto, atualize currentUser via route params (não altera design)
-          // opcional: poderia chamar um context para atualizar usuário global; aqui apenas log
           console.log('[Home] perfil remoto disponível:', profile.email || profile.displayName);
         }
 
-        // tenta sincronizar outbox primeiro (enviar transações locais pendentes)
         await flushOutbox();
-
-        // agora tentar obter dados "oficiais" do servidor e sobrescrever cache (se o servidor estiver ok)
         await syncFromServer();
-        
-        // Carrega dados analíticos do backend
         await loadAnalyticsData();
       } catch (err) {
         console.error('[Home] erro na inicialização completa:', err);
@@ -362,7 +384,6 @@ const HomeScreen = ({ navigation, route }) => {
       }
     })();
 
-    // polling opcional: sincroniza a cada X minutos — aqui definido para 5 minutos
     const interval = setInterval(() => {
       flushOutbox().catch(e => console.warn('[Home] flushOutbox interval falhou', e));
       syncFromServer().catch(e => console.warn('[Home] syncFromServer interval falhou', e));
@@ -374,7 +395,6 @@ const HomeScreen = ({ navigation, route }) => {
     };
   }, []);
 
-  // Pull-to-refresh: recarrega do servidor e do cache
   const onRefresh = async () => {
     setRefreshing(true);
     setError(null);
@@ -389,15 +409,12 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Função para adicionar nova transação com persistência local e tentativa de envio ao servidor
   const handleAddTransaction = async (transactionData) => {
     try {
-      // Garante formato básico
       const baseCurrency = 'BRL';
       const nowIso = new Date().toISOString();
 
       const newTransaction = {
-        // unico id local temporário
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         createdAt: nowIso,
         transactionDate: transactionData.transactionDate || nowIso,
@@ -407,24 +424,19 @@ const HomeScreen = ({ navigation, route }) => {
         currency: transactionData.currency || baseCurrency,
         status: transactionData.isRecurring ? 'agendado' : 'concluído',
         category: transactionData.category || 'Variável',
-        isLocalOnly: true, // flag para indicar que ainda não está no servidor
+        isLocalOnly: true,
         metadata: transactionData.metadata || {},
         isRecurring: !!transactionData.isRecurring,
       };
 
-      // Atualiza estado local e AsyncStorage imediatamente (optimistic UI)
       const updatedTransactions = [newTransaction, ...userTransactions];
       setUserTransactions(updatedTransactions);
       await saveAsyncData(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
       console.log('[Home] transação salva localmente (optimistic):', newTransaction.id);
 
-      // Se transação for recorrente ou se usuário estiver offline, coloque no outbox
-      // Tenta enviar ao servidor
       const res = await postTransactionToServer(newTransaction);
       if (res.success) {
-        // Substitui item local por item retornado pelo servidor (se aplicável)
         const serverTx = res.data;
-        // Mapeia e substitui pelo serverTx (mantém ordem)
         const merged = updatedTransactions.map((t) =>
           t.id === newTransaction.id ? (serverTx.id ? {
             id: serverTx.id.toString(),
@@ -432,8 +444,8 @@ const HomeScreen = ({ navigation, route }) => {
             amount: parseFloat(serverTx.amount) || t.amount,
             type: serverTx.type || t.type,
             currency: serverTx.currency || t.currency,
-            transactionDate: serverTx.transactionDate || t.transactionDate,
-            createdAt: serverTx.createdAt || t.createdAt,
+            transactionDate: serverTx.transaction_date || serverTx.transactionDate || t.transactionDate,
+            createdAt: serverTx.created_at || serverTx.createdAt || t.createdAt,
             status: serverTx.status || t.status,
             category: serverTx.category || t.category,
             metadata: serverTx.metadata || t.metadata,
@@ -444,12 +456,10 @@ const HomeScreen = ({ navigation, route }) => {
         await saveAsyncData(TRANSACTIONS_STORAGE_KEY, merged);
         console.log('[Home] transação sincronizada com servidor:', serverTx.id || 'sem id retornado');
       } else {
-        // Falhou: adiciona ao outbox para re-tentativa posterior
         await addToOutbox(newTransaction);
         Alert.alert('Transação salva localmente', 'Sem conexão com o servidor — será sincronizada automaticamente quando possível.');
       }
 
-      // Ajusta saldo no servidor atomicamente
       if (!newTransaction.isRecurring && newTransaction.currency === baseCurrency) {
         const adjustment = newTransaction.type === 'income' ? newTransaction.amount : -newTransaction.amount;
         const result = await adjustBalance(adjustment, newTransaction.currency || 'BRL');
@@ -467,7 +477,6 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- Funções auxiliares para eventos
   const handleAddEvent = () => {
     if (!eventForm.title || !eventForm.date || !eventForm.time) {
       Alert.alert('Erro', 'Preencha pelo menos título, data e horário.');
@@ -484,7 +493,6 @@ const HomeScreen = ({ navigation, route }) => {
     setEvents(updatedEvents);
     saveAsyncData(EVENTS_STORAGE_KEY, updatedEvents);
 
-    // Reset form
     setEventForm({
       title: '',
       description: '',
@@ -511,28 +519,22 @@ const HomeScreen = ({ navigation, route }) => {
     }));
   };
 
-  // --- Filtros e cálculos de gráfico (mantidos)
   const allTransactions = userTransactions;
 
   const filteredTransactions = allTransactions.filter(t => {
-    // Filtro por tipo (Entrada/Saída)
     if (transactionFilter === 'Entrada' && t.type !== 'income') return false;
     if (transactionFilter === 'Saída' && t.type !== 'expense') return false;
 
-    // Filtrar apenas moeda base (BRL) e transações concluídas
     const isBaseCurrency = (t.currency || 'BRL') === 'BRL';
     const isConcluded = t.status === 'concluído';
     if (!isBaseCurrency || !isConcluded) return false;
 
-    // Filtro por texto de busca
     const searchableText = (t.description || t.name || '').toLowerCase();
     if (searchText && !searchableText.includes(searchText.toLowerCase())) return false;
 
-    // Filtro por valor (usando filterValues)
     if (filterValues.minAmount && Math.abs(t.amount) < parseFloat(filterValues.minAmount)) return false;
     if (filterValues.maxAmount && Math.abs(t.amount) > parseFloat(filterValues.maxAmount)) return false;
 
-    // Filtro temporal baseado em datas reais das transações
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
@@ -557,50 +559,6 @@ const HomeScreen = ({ navigation, route }) => {
     return true;
   });
 
-
-  // Calcula valores para o gráfico considerando período baseado em datas reais
-  const calculateChartData = () => {
-    const now = new Date();
-    let startDate = now;
-
-    if (chartPeriod === 'Hoje') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (chartPeriod === 'Esta semana') {
-      startDate = new Date(now.getTime() - (6 * 24 * 60 * 60 * 1000));
-      startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    } else if (chartPeriod === 'Este Mês') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    const transactionsToChart = allTransactions.filter(transaction => {
-      const transactionDateStr = transaction.transactionDate || transaction.createdAt;
-      const transactionDate = new Date(transactionDateStr);
-
-      if (isNaN(transactionDate.getTime())) {
-        return false;
-      }
-
-      const isBaseCurrency = (transaction.currency || 'BRL') === 'BRL';
-      const isConcluded = transaction.status === 'concluído';
-
-      return transactionDate >= startDate && transactionDate <= now &&
-             isBaseCurrency && isConcluded;
-    });
-
-    const income = transactionsToChart
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-
-    const expenses = transactionsToChart
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-
-    return { income, expenses };
-  };
-
-  const { income, expenses } = calculateChartData();
-
-  // --- UI (mantive exatamente a estrutura, estilos e nomes originais)
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -830,6 +788,8 @@ const HomeScreen = ({ navigation, route }) => {
                 <Text style={styles.addButtonText}>Adicionar nova</Text>
               </TouchableOpacity>
             </View>
+          </>
+        )}
 
         {activeTab === 'Agenda' && (
           <View style={styles.agendaContainer}>
@@ -1220,7 +1180,6 @@ const HomeScreen = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
-
 // ===== STYLES (mantive exatamente sua definição original) =====
 const styles = StyleSheet.create({
   container: {
@@ -2210,5 +2169,4 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
-import { on, Events } from './utils/EventBus';
 

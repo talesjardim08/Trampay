@@ -22,44 +22,50 @@ namespace TrampayBackend.Controllers
             _logger = logger;
         }
 
-        [HttpGet("summary")]
-        [Authorize]
-        public async Task<IActionResult> GetSummary()
+        
+[HttpGet("summary")]
+[Authorize]
+public async Task<IActionResult> GetSummary()
+{
+    try
+    {
+        if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
+            return Unauthorized();
+
+        var sql = @"
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'income' AND status = 'concluído' AND currency = 'BRL' THEN amount ELSE 0 END), 0) AS Income,
+                COALESCE(SUM(CASE WHEN type = 'expense' AND status = 'concluído' AND currency = 'BRL' THEN amount ELSE 0 END), 0) AS Expenses,
+                (SELECT COUNT(*) FROM clients WHERE owner_user_id = @UserId) AS Clients,
+                (SELECT COUNT(*) FROM services WHERE owner_user_id = @UserId) AS Services,
+                0 AS InventoryValue,
+                (SELECT COUNT(*) FROM events WHERE owner_user_id = @UserId AND event_date >= CURRENT_DATE()) AS UpcomingEvents
+            FROM transactions
+            WHERE owner_user_id = @UserId;";
+
+        var result = await _db.QueryFirstOrDefaultAsync(sql, new { UserId = userId });
+        
+        decimal income = result?.Income ?? 0;
+        decimal expenses = result?.Expenses ?? 0;
+        decimal balance = income - expenses;
+
+        return Ok(new
         {
-            try
-            {
-                if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
-                    return Unauthorized();
-
-                var sql = @"
-                    SELECT
-                        COALESCE(SUM(CASE WHEN type = 'income' AND status = 'concluído' AND currency = 'BRL' THEN amount END), 0) AS Income,
-                        COALESCE(SUM(CASE WHEN type = 'expense' AND status = 'concluído' AND currency = 'BRL' THEN amount END), 0) AS Expenses,
-                        (SELECT COUNT(*) FROM clients WHERE owner_user_id = @UserId) AS Clients,
-                        (SELECT COUNT(*) FROM services WHERE owner_user_id = @UserId) AS Services,
-                        0 AS InventoryValue,
-                        (SELECT COUNT(*) FROM events WHERE owner_user_id = @UserId AND event_date >= CURRENT_DATE()) AS UpcomingEvents
-                    FROM transactions
-                    WHERE owner_user_id = @UserId;";
-
-                var result = await _db.QueryFirstOrDefaultAsync(sql, new { UserId = userId });
-
-                return Ok(new
-                {
-                    income = result.Income,
-                    expenses = result.Expenses,
-                    clients = result.Clients,
-                    services = result.Services,
-                    inventoryValue = result.InventoryValue,
-                    upcomingEvents = result.UpcomingEvents
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao gerar summary analytics.");
-                return StatusCode(500, new { error = "Erro interno ao obter o resumo." });
-            }
-        }
+            income,
+            expenses,
+            balance, // ADICIONAR balance ao retorno
+            clients = result?.Clients ?? 0,
+            services = result?.Services ?? 0,
+            inventoryValue = result?.InventoryValue ?? 0,
+            upcomingEvents = result?.UpcomingEvents ?? 0
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Erro ao gerar summary analytics.");
+        return StatusCode(500, new { error = "Erro interno ao obter o resumo." });
+    }
+}
 
         [HttpGet("expenses-by-category")]
         [Authorize]

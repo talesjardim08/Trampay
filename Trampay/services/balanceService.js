@@ -58,3 +58,25 @@ export async function updateBalance(balance, currency = 'BRL') {
     return { success: false, error: err };
   }
 }
+
+
+/**
+ * Recalcula o saldo baseado nas transações (força recálculo no backend)
+ * @param {string} currency - Moeda (default: BRL)
+ * @returns {Promise<{success: boolean, balance?: number, totalIncome?: number, totalExpenses?: number, error?: any}>}
+ */
+export async function recalculateBalance(currency = 'BRL') {
+  try {
+    const resp = await api.get('/transactions/calculate-balance', { params: { currency } });
+    console.log('[BalanceService] Saldo recalculado:', resp?.data);
+    return { 
+      success: true, 
+      balance: parseFloat(resp?.data?.balance),
+      totalIncome: parseFloat(resp?.data?.totalIncome),
+      totalExpenses: parseFloat(resp?.data?.totalExpenses)
+    };
+  } catch (err) {
+    console.error('[BalanceService] Erro ao recalcular saldo:', err?.response?.data || err.message);
+    return { success: false, error: err };
+  }
+}
