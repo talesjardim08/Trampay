@@ -22,6 +22,7 @@ import api from '../services/api';
 import AddTransactionModal from '../components/AddTransactionModal';
 import PieChart from '../components/PieChart';
 import BarChart from '../components/BarChart';
+import { fetchTransactions, createTransaction } from '../services/transactionsService';
 
 const { width } = Dimensions.get('window');
 
@@ -110,94 +111,86 @@ const CashFlowScreen = ({ navigation }) => {
 
   // Carregar transações
   const loadTransactions = async () => {
-    try {
-      // Tenta migrar dados antigos se necessário
-      await SecureStorage.migrateExistingData(TRANSACTIONS_STORAGE_KEY).catch(() => {});
-      
-      const stored = await SecureStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-      if (stored) {
-        const transactionsList = Array.isArray(stored) ? stored : [];
-        transactionsList.sort((a,b)=> new Date(b.transactionDate||b.createdAt) - new Date(a.transactionDate||a.createdAt));
-        setTransactions(transactionsList);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar transações:', error);
-    }
-  };
-
-  // Carregar saldo localmente
-  const loadBalanceLocal = async () => {
-    try {
-      const stored = await SecureStorage.getItem(BALANCE_STORAGE_KEY);
-      if (stored !== null && stored !== undefined) {
-        setBalance(parseFloat(stored));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar saldo local:', error);
-    }
-  };
-
-  // Salvar transações
-  const saveTransactions = async (transactionsList) => {
-    try {
-      const sorted = [...transactionsList].sort((a,b)=> new Date(b.transactionDate||b.createdAt) - new Date(a.transactionDate||a.createdAt));
-      await SecureStorage.setItem(TRANSACTIONS_STORAGE_KEY, sorted);
-      setTransactions(sorted);
-      emit(Events.TransactionsUpdated, sorted);
-    } catch (error) {
-      console.error('Erro ao salvar transações:', error);
-      Alert.alert('Erro', 'Não foi possível salvar a transação');
-    }
-  };
-
-  // Salvar saldo
-  const saveBalance = async (newBalance) => {
-    try {
-      const val = parseFloat(newBalance);
-      if (isNaN(val)) return;
-      
-      await SecureStorage.setItem(BALANCE_STORAGE_KEY, val);
-      setBalance(val);
-      emit(Events.BalanceUpdated, val);
-    } catch (error) {
-      console.error('Erro ao salvar saldo:', error);
-    }
-  };
-
-  // Adicionar nova transação
-  const handleAddTransaction = async (transactionData) => {
-    // Validar moeda base (apenas BRL para cálculo de saldo)
-    const baseCurrency = 'BRL';
+  try {
+    // Buscar do servidor
+    const serverTransactions = await fetchTransactions();
     
-    const newTransaction = {
-      ...transactionData,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      status: transactionData.isRecurring ? 'agendado' : 'concluído'
-    };
+    // Normalizar dados
+    const normalized = serverTransactions.map(t => ({
+      id: t.id?.toString(),
+      description: t.title || t.description || 'Transação',
+      amount: parseFloat(t.amount) || 0,
+      type: t.type,
+      currency: t.currency || 'BRL',
+      transactionDate: t.transaction_date || t.transactionDate || t.created_at,
+      createdAt: t.created_at || new Date().toISOString(),
+      status: t.status || 'concluído',
+      category: t.category || 'Outros',
+      metadata: t.metadata || {},
+    }));
 
-    const updatedTransactions = [...transactions, newTransaction];
-    await saveTransactions(updatedTransactions);
+    normalized.sort((a, b) => 
+      new Date(b.transactionDate || b.createdAt) - new Date(a.transactionDate || a.createdAt)
+    );
 
-    // Atualizar saldo apenas se a transação não for recorrente E for da moeda base (tratando undefined como BRL)
-    if (!transactionData.isRecurring && (transactionData.currency || 'BRL') === baseCurrency) {
-      const currentBal = isNaN(balance) ? 0 : balance;
-      const amount = parseFloat(transactionData.amount) || 0;
+    setTransactions(normalized);
+    
+    // Salvar no cache local
+    await SecureStorage.setItem(TRANSACTIONS_STORAGE_KEY, normalized);
+  } catch (error) {
+    console.error('Erro ao carregar transações:', error);
+    
+    // Fallback para cache local
+    const cached = await SecureStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+    if (cached) setTransactions(cached);
+  }
+};
+
+ const handleAddTransaction = async (transactionData) => {
+  try {
+    // Criar no servidor
+    const result = await createTransaction(transactionData);
+    
+    if (result.success) {
+      // Recarregar transações do servidor
+      await loadTransactions();
       
-      const newBalance = transactionData.type === 'income' 
-        ? currentBal + amount 
-        : currentBal - amount;
-        
-      await saveBalance(newBalance);
-    } else if ((transactionData.currency || 'BRL') !== baseCurrency) {
+      // Recarregar saldo do servidor
+      await syncBalanceFromServer();
+      
+      setAddTransactionVisible(false);
+      Alert.alert('Sucesso!', 'Transação adicionada com sucesso!');
+    } else {
+      // Salvar localmente para sync posterior
+      const newTransaction = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString(),
+        transactionDate: transactionData.transactionDate || new Date().toISOString(),
+        description: transactionData.description || 'Transação',
+        amount: parseFloat(transactionData.amount) || 0,
+        type: transactionData.type || 'expense',
+        currency: transactionData.currency || 'BRL',
+        status: transactionData.isRecurring ? 'agendado' : 'concluído',
+        category: transactionData.category || 'Outros',
+        isLocalOnly: true,
+        metadata: transactionData.metadata || {},
+      };
+
+      const updatedTransactions = [newTransaction, ...transactions];
+      setTransactions(updatedTransactions);
+      await SecureStorage.setItem(TRANSACTIONS_STORAGE_KEY, updatedTransactions);
+      
+      setAddTransactionVisible(false);
       Alert.alert(
-        'Informação', 
-        'Transação salva! Nota: Apenas transações em BRL afetam o saldo principal.'
+        'Transação salva localmente', 
+        'Sem conexão com servidor. Será sincronizada quando possível.'
       );
     }
-
-    setAddTransactionVisible(false);
-  };
+  } catch (error) {
+    console.error('Erro ao adicionar transação:', error);
+    Alert.alert('Erro', 'Não foi possível adicionar a transação. Tente novamente.');
+  }
+};
 
   // Calcular resumo financeiro
   const getFinancialSummary = () => {
@@ -1087,5 +1080,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
   },
 });
+
 
 export default CashFlowScreen;
