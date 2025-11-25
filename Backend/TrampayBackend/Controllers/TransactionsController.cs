@@ -1,4 +1,4 @@
-// project/Trampay-main/Backend/TrampayBackend/Controllers/TransactionsController.cs
+// Backend/TrampayBackend/Controllers/TransactionsController.cs
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -49,11 +49,14 @@ namespace TrampayBackend.Controllers
 
             await EnsureTransactionSchema();
 
-            var sql = @"SELECT * FROM transactions WHERE owner_user_id = @UserId
+            var sql = @"SELECT id, owner_user_id, account_id, title, description, type, amount, category, 
+                               currency, transaction_date, status, metadata, created_at, updated_at 
+                        FROM transactions 
+                        WHERE owner_user_id = @UserId
                         AND (@Type IS NULL OR type = @Type)
                         AND (@From IS NULL OR transaction_date >= @From)
                         AND (@To IS NULL OR transaction_date <= @To)
-                        ORDER BY transaction_date DESC";
+                        ORDER BY transaction_date DESC, created_at DESC";
 
             var rows = await _db.QueryAsync(sql, new { UserId = userId, Type = type, From = from, To = to });
             return Ok(rows);
@@ -67,43 +70,107 @@ namespace TrampayBackend.Controllers
 
             await EnsureTransactionSchema();
 
-            var sql = @"INSERT INTO transactions (owner_user_id, account_id, title, type, amount, category, currency, transaction_date, status, created_at)
-                        VALUES (@Owner, @Account, @Title, @Type, @Amount, @Category, @Currency, @Date, @Status, NOW());
+            var sql = @"INSERT INTO transactions (owner_user_id, account_id, title, description, type, amount, 
+                                                  category, currency, transaction_date, status, metadata, created_at)
+                        VALUES (@Owner, @Account, @Title, @Description, @Type, @Amount, @Category, @Currency, 
+                                @Date, @Status, @Metadata, NOW());
                         SELECT LAST_INSERT_ID();";
 
             var id = await _db.ExecuteScalarAsync<long>(sql, new
             {
                 Owner = userId,
                 Account = dto.AccountId,
-                Title = dto.Title ?? "Transação",
+                Title = dto.Title ?? dto.Description ?? "Transação",
+                Description = dto.Description ?? dto.Title ?? "Transação",
                 Type = dto.Type,
                 Amount = dto.Amount,
                 Category = dto.Category ?? "Outros",
                 Currency = dto.Currency ?? "BRL",
                 Date = dto.TransactionDate?.Date ?? DateTime.UtcNow.Date,
-                Status = dto.Status ?? "concluído"
+                Status = dto.Status ?? "concluído",
+                Metadata = dto.Metadata
             });
 
-            // Atualizar saldo em mãos automaticamente
-            var adjustmentAmount = dto.Type == "income" ? dto.Amount : -dto.Amount;
-            var balanceSql = @"
-                INSERT INTO user_balance (user_id, balance, currency, updated_at) 
-                VALUES (@UserId, @Amount, @Currency, NOW())
-                ON DUPLICATE KEY UPDATE 
-                    balance = balance + @Amount, 
-                    updated_at = NOW()";
-
-            await _db.ExecuteAsync(balanceSql, new
+            // Atualizar saldo automaticamente apenas para BRL
+            if ((dto.Currency ?? "BRL") == "BRL" && (dto.Status ?? "concluído") == "concluído")
             {
-                UserId = userId,
-                Amount = adjustmentAmount,
-                Currency = dto.Currency ?? "BRL"
-            });
+                var adjustmentAmount = dto.Type == "income" ? dto.Amount : -dto.Amount;
+                var balanceSql = @"
+                    INSERT INTO user_balance (user_id, balance, currency, updated_at) 
+                    VALUES (@UserId, @Amount, 'BRL', NOW())
+                    ON DUPLICATE KEY UPDATE 
+                        balance = balance + @Amount, 
+                        updated_at = NOW()";
+
+                await _db.ExecuteAsync(balanceSql, new
+                {
+                    UserId = userId,
+                    Amount = adjustmentAmount
+                });
+            }
 
             var row = await _db.QueryFirstOrDefaultAsync("SELECT * FROM transactions WHERE id = @Id", new { Id = id });
             return Created($"/api/transactions/{id}", row);
         }
 
-        public record CreateTransactionDto(long AccountId, string Type, decimal Amount, string? Currency, DateTime? TransactionDate, string? Status, string? Title, string? Category);
+        [HttpGet("{id:long}")]
+        [Authorize]
+        public async Task<IActionResult> GetById(long id)
+        {
+            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+
+            var sql = "SELECT * FROM transactions WHERE id = @Id AND owner_user_id = @UserId LIMIT 1";
+            var transaction = await _db.QueryFirstOrDefaultAsync(sql, new { Id = id, UserId = userId });
+            
+            if (transaction == null) return NotFound();
+            
+            return Ok(transaction);
+        }
+
+        [HttpDelete("{id:long}")]
+        [Authorize]
+        public async Task<IActionResult> Delete(long id)
+        {
+            if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) return Unauthorized();
+
+            // Buscar transação para ajustar saldo
+            var transaction = await _db.QueryFirstOrDefaultAsync<dynamic>(
+                "SELECT amount, type, currency, status FROM transactions WHERE id = @Id AND owner_user_id = @UserId",
+                new { Id = id, UserId = userId }
+            );
+
+            if (transaction == null) return NotFound();
+
+            // Deletar transação
+            await _db.ExecuteAsync("DELETE FROM transactions WHERE id = @Id AND owner_user_id = @UserId", 
+                new { Id = id, UserId = userId });
+
+            // Ajustar saldo (reverter operação)
+            if (transaction.currency == "BRL" && transaction.status == "concluído")
+            {
+                var adjustmentAmount = transaction.type == "income" ? -transaction.amount : transaction.amount;
+                await _db.ExecuteAsync(@"
+                    UPDATE user_balance 
+                    SET balance = balance + @Amount, updated_at = NOW()
+                    WHERE user_id = @UserId AND currency = 'BRL'",
+                    new { Amount = adjustmentAmount, UserId = userId }
+                );
+            }
+
+            return NoContent();
+        }
+
+        public record CreateTransactionDto(
+            long? AccountId, 
+            string? Title,
+            string? Description,
+            string Type, 
+            decimal Amount, 
+            string? Currency, 
+            DateTime? TransactionDate, 
+            string? Status, 
+            string? Category,
+            string? Metadata
+        );
     }
 }
