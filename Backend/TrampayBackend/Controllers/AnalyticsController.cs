@@ -1,4 +1,4 @@
-// project/Trampay-main/Backend/TrampayBackend/Controllers/AnalyticsController.cs
+// Backend/TrampayBackend/Controllers/AnalyticsController.cs
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -28,17 +28,21 @@ namespace TrampayBackend.Controllers
         {
             try
             {
+                if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
+                    return Unauthorized();
+
                 var sql = @"
                     SELECT
-                        COALESCE(SUM(CASE WHEN type = 'income'  THEN amount END), 0) AS Income,
-                        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS Expenses,
-                        (SELECT COUNT(*) FROM clients) AS Clients,
-                        (SELECT COUNT(*) FROM services) AS Services,
+                        COALESCE(SUM(CASE WHEN type = 'income' AND status = 'concluído' AND currency = 'BRL' THEN amount END), 0) AS Income,
+                        COALESCE(SUM(CASE WHEN type = 'expense' AND status = 'concluído' AND currency = 'BRL' THEN amount END), 0) AS Expenses,
+                        (SELECT COUNT(*) FROM clients WHERE owner_user_id = @UserId) AS Clients,
+                        (SELECT COUNT(*) FROM services WHERE owner_user_id = @UserId) AS Services,
                         0 AS InventoryValue,
-                        (SELECT COUNT(*) FROM events WHERE event_date >= CURRENT_DATE()) AS UpcomingEvents
-                    FROM transactions;";
+                        (SELECT COUNT(*) FROM events WHERE owner_user_id = @UserId AND event_date >= CURRENT_DATE()) AS UpcomingEvents
+                    FROM transactions
+                    WHERE owner_user_id = @UserId;";
 
-                var result = await _db.QueryFirstOrDefaultAsync(sql);
+                var result = await _db.QueryFirstOrDefaultAsync(sql, new { UserId = userId });
 
                 return Ok(new
                 {
@@ -63,15 +67,18 @@ namespace TrampayBackend.Controllers
         {
             try
             {
+                if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
+                    return Unauthorized();
+
                 var sql = @"
                     SELECT category, SUM(amount) AS total
                     FROM transactions
-                    WHERE type = 'expense'
+                    WHERE type = 'expense' AND status = 'concluído' AND currency = 'BRL' AND owner_user_id = @UserId
                     GROUP BY category
                     ORDER BY total DESC;
                 ";
 
-                var result = await _db.QueryAsync(sql);
+                var result = await _db.QueryAsync(sql, new { UserId = userId });
                 return Ok(result);
             }
             catch (Exception ex)
@@ -87,15 +94,18 @@ namespace TrampayBackend.Controllers
         {
             try
             {
+                if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
+                    return Unauthorized();
+
                 var sql = @"
                     SELECT category, SUM(amount) AS total
                     FROM transactions
-                    WHERE type = 'income'
+                    WHERE type = 'income' AND status = 'concluído' AND currency = 'BRL' AND owner_user_id = @UserId
                     GROUP BY category
                     ORDER BY total DESC;
                 ";
 
-                var result = await _db.QueryAsync(sql);
+                var result = await _db.QueryAsync(sql, new { UserId = userId });
                 return Ok(result);
             }
             catch (Exception ex)
@@ -105,127 +115,38 @@ namespace TrampayBackend.Controllers
             }
         }
 
-        [HttpGet("categories")]
-        [Authorize]
-        public async Task<IActionResult> GetCategories()
-        {
-            try
-            {
-                var sql = @"
-                    SELECT DISTINCT category 
-                    FROM transactions
-                    WHERE category IS NOT NULL
-                    ORDER BY category;
-                ";
-
-                var result = await _db.QueryAsync<string>(sql);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao listar categorias.");
-                return StatusCode(500, new { error = "Erro ao listar categorias." });
-            }
-        }
-
-        [HttpGet("growth-trends")]
-        [Authorize]
-        public async Task<IActionResult> GetGrowthTrends()
-        {
-            try
-            {
-                var sql = @"
-                    SELECT 
-                        DATE_FORMAT(transaction_date, '%Y-%m') AS month,
-                        SUM(CASE WHEN type = 'income' THEN amount END) AS revenue,
-                        SUM(CASE WHEN type = 'expense' THEN amount END) AS expenses
-                    FROM transactions
-                    GROUP BY month
-                    ORDER BY month ASC;
-                ";
-
-                var result = await _db.QueryAsync(sql);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao gerar crescimento mensal.");
-                return StatusCode(500, new { error = "Erro ao gerar tendências de crescimento." });
-            }
-        }
-
         [HttpGet("cashflow")]
         [Authorize]
         public async Task<IActionResult> GetCashFlow([FromQuery] string period = "month")
         {
             try
             {
+                if (!long.TryParse(User.FindFirst("id")?.Value, out var userId)) 
+                    return Unauthorized();
+
                 var sql = period == "week"
                     ? @"SELECT DATE(transaction_date) AS day,
-                            SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
-                            SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expenses
+                            SUM(CASE WHEN type='income' AND status='concluído' AND currency='BRL' THEN amount ELSE 0 END) AS income,
+                            SUM(CASE WHEN type='expense' AND status='concluído' AND currency='BRL' THEN amount ELSE 0 END) AS expenses
                         FROM transactions
-                        WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                        WHERE owner_user_id = @UserId AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
                         GROUP BY day
                         ORDER BY day ASC"
                     : @"SELECT DATE_FORMAT(transaction_date, '%Y-%m') AS month,
-                            SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
-                            SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expenses
+                            SUM(CASE WHEN type='income' AND status='concluído' AND currency='BRL' THEN amount ELSE 0 END) AS income,
+                            SUM(CASE WHEN type='expense' AND status='concluído' AND currency='BRL' THEN amount ELSE 0 END) AS expenses
                         FROM transactions
-                        WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                        WHERE owner_user_id = @UserId AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
                         GROUP BY month
                         ORDER BY month ASC";
 
-                var rows = await _db.QueryAsync(sql);
+                var rows = await _db.QueryAsync(sql, new { UserId = userId });
                 return Ok(rows);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao gerar cashflow.");
                 return StatusCode(500, new { error = "Erro ao gerar fluxo de caixa." });
-            }
-        }
-
-        [HttpGet("top-clients")]
-        [Authorize]
-        public async Task<IActionResult> GetTopClients([FromQuery] int limit = 5)
-        {
-            try
-            {
-                var sql = @"SELECT c.id, c.name, COALESCE(SUM(p.amount),0) AS total
-                            FROM clients c
-                            LEFT JOIN payments p ON p.client_id = c.id
-                            GROUP BY c.id, c.name
-                            ORDER BY total DESC
-                            LIMIT @Limit";
-                var rows = await _db.QueryAsync(sql, new { Limit = limit });
-                return Ok(rows);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao listar top clients.");
-                return StatusCode(500, new { error = "Erro ao listar top clientes." });
-            }
-        }
-
-        [HttpGet("profitable-items")]
-        [Authorize]
-        public async Task<IActionResult> GetProfitableItems([FromQuery] int limit = 5)
-        {
-            try
-            {
-                var sql = @"SELECT id, name, selling_price, cost_price,
-                                (selling_price - cost_price) AS margin
-                            FROM inventory_items
-                            ORDER BY margin DESC
-                            LIMIT @Limit";
-                var rows = await _db.QueryAsync(sql, new { Limit = limit });
-                return Ok(rows);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao listar itens lucrativos.");
-                return StatusCode(500, new { error = "Erro ao listar itens lucrativos." });
             }
         }
     }
