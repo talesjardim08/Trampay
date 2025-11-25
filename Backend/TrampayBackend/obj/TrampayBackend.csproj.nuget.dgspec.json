@@ -49,7 +49,7 @@
             },
             "Dapper": {
               "target": "Package",
-              "version": "[2.1.0, )"
+              "version": "[2.1.66, )"
             },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
@@ -59,9 +59,13 @@
               "target": "Package",
               "version": "[8.0.0, )"
             },
+            "MySql.Data": {
+              "target": "Package",
+              "version": "[9.5.0, )"
+            },
             "MySqlConnector": {
               "target": "Package",
-              "version": "[2.4.0, )"
+              "version": "[2.5.0, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",

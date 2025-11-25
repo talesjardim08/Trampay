@@ -11,13 +11,67 @@
           "lib/net5.0/BCrypt.Net-Next.dll": {}
         }
       },
-      "Dapper/2.1.1": {
+      "BouncyCastle.Cryptography/2.6.2": {
         "type": "package",
         "compile": {
-          "lib/net5.0/Dapper.dll": {}
+          "lib/net6.0/BouncyCastle.Cryptography.dll": {}
         },
         "runtime": {
-          "lib/net5.0/Dapper.dll": {}
+          "lib/net6.0/BouncyCastle.Cryptography.dll": {}
+        }
+      },
+      "Dapper/2.1.66": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Dapper.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/Dapper.dll": {}
+        }
+      },
+      "Google.Protobuf/3.32.0": {
+        "type": "package",
+        "compile": {
+          "lib/net5.0/Google.Protobuf.dll": {
+            "related": ".pdb"
+          }
+        },
+        "runtime": {
+          "lib/net5.0/Google.Protobuf.dll": {
+            "related": ".pdb"
+          }
+        }
+      },
+      "K4os.Compression.LZ4/1.3.8": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/K4os.Compression.LZ4.dll": {}
+        },
+        "runtime": {
+          "lib/net6.0/K4os.Compression.LZ4.dll": {}
+        }
+      },
+      "K4os.Compression.LZ4.Streams/1.3.8": {
+        "type": "package",
+        "dependencies": {
+          "K4os.Compression.LZ4": "1.3.8",
+          "K4os.Hash.xxHash": "1.0.8",
+          "System.IO.Pipelines": "6.0.3"
+        },
+        "compile": {
+          "lib/net6.0/K4os.Compression.LZ4.Streams.dll": {}
+        },
+        "runtime": {
+          "lib/net6.0/K4os.Compression.LZ4.Streams.dll": {}
+        }
+      },
+      "K4os.Hash.xxHash/1.0.8": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/K4os.Hash.xxHash.dll": {}
+        },
+        "runtime": {
+          "lib/net6.0/K4os.Hash.xxHash.dll": {}
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer/8.0.0": {
@@ -185,7 +239,46 @@
           }
         }
       },
-      "MySqlConnector/2.4.0": {
+      "MySql.Data/9.5.0": {
+        "type": "package",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.2",
+          "Google.Protobuf": "3.32.0",
+          "K4os.Compression.LZ4.Streams": "1.3.8",
+          "System.Configuration.ConfigurationManager": "8.0.0",
+          "System.Security.Permissions": "8.0.0",
+          "ZstdSharp.Port": "0.8.6"
+        },
+        "compile": {
+          "lib/net8.0/MySql.Data.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/MySql.Data.dll": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win-x64/native/comerr64.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x64/native/gssapi64.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x64/native/k5sprt64.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x64/native/krb5_64.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x64/native/krbcc64.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          }
+        }
+      },
+      "MySqlConnector/2.5.0": {
         "type": "package",
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
@@ -261,6 +354,44 @@
           "Microsoft.AspNetCore.App"
         ]
       },
+      "System.Configuration.ConfigurationManager/8.0.0": {
+        "type": "package",
+        "dependencies": {
+          "System.Diagnostics.EventLog": "8.0.0",
+          "System.Security.Cryptography.ProtectedData": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Configuration.ConfigurationManager.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/System.Configuration.ConfigurationManager.dll": {}
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
+      },
+      "System.Diagnostics.EventLog/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/System.Diagnostics.EventLog.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/System.Diagnostics.EventLog.dll": {}
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net8.0/System.Diagnostics.EventLog.Messages.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          },
+          "runtimes/win/lib/net8.0/System.Diagnostics.EventLog.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
       "System.IdentityModel.Tokens.Jwt/8.0.0": {
         "type": "package",
         "dependencies": {
@@ -276,6 +407,69 @@
           "lib/net8.0/System.IdentityModel.Tokens.Jwt.dll": {
             "related": ".xml"
           }
+        }
+      },
+      "System.IO.Pipelines/6.0.3": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/System.IO.Pipelines.dll": {}
+        },
+        "runtime": {
+          "lib/net6.0/System.IO.Pipelines.dll": {}
+        },
+        "build": {
+          "buildTransitive/netcoreapp3.1/_._": {}
+        }
+      },
+      "System.Security.Cryptography.ProtectedData/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/System.Security.Cryptography.ProtectedData.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/System.Security.Cryptography.ProtectedData.dll": {}
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
+      },
+      "System.Security.Permissions/8.0.0": {
+        "type": "package",
+        "dependencies": {
+          "System.Windows.Extensions": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Security.Permissions.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/System.Security.Permissions.dll": {}
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
+      },
+      "System.Windows.Extensions/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/System.Windows.Extensions.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/System.Windows.Extensions.dll": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net8.0/System.Windows.Extensions.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
+      "ZstdSharp.Port/0.8.6": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/ZstdSharp.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/ZstdSharp.dll": {}
         }
       }
     }
@@ -303,20 +497,104 @@
         "lib/netstandard2.1/BCrypt.Net-Next.dll"
       ]
     },
-    "Dapper/2.1.1": {
-      "sha512": "Av6CG0KMZIYBIsvontMo2xzKqMHOpriJpCtHxubuIC81pPaSQC8zrpYbjjEf2kKuMSs6RnGaehc5+Q5dQ4U7UA==",
+    "BouncyCastle.Cryptography/2.6.2": {
+      "sha512": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w==",
       "type": "package",
-      "path": "dapper/2.1.1",
+      "path": "bouncycastle.cryptography/2.6.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.md",
+        "README.md",
+        "bouncycastle.cryptography.2.6.2.nupkg.sha512",
+        "bouncycastle.cryptography.nuspec",
+        "lib/net461/BouncyCastle.Cryptography.dll",
+        "lib/net6.0/BouncyCastle.Cryptography.dll",
+        "lib/netstandard2.0/BouncyCastle.Cryptography.dll",
+        "packageIcon.png"
+      ]
+    },
+    "Dapper/2.1.66": {
+      "sha512": "/q77jUgDOS+bzkmk3Vy9SiWMaetTw+NOoPAV0xPBsGVAyljd5S6P+4RUW7R3ZUGGr9lDRyPKgAMj2UAOwvqZYw==",
+      "type": "package",
+      "path": "dapper/2.1.66",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "Dapper.png",
-        "dapper.2.1.1.nupkg.sha512",
+        "dapper.2.1.66.nupkg.sha512",
         "dapper.nuspec",
         "lib/net461/Dapper.dll",
-        "lib/net5.0/Dapper.dll",
+        "lib/net8.0/Dapper.dll",
         "lib/netstandard2.0/Dapper.dll",
         "readme.md"
+      ]
+    },
+    "Google.Protobuf/3.32.0": {
+      "sha512": "fsKxV5bhcvXmZi+cUo5+IxzRMBHwHeFO8G5utNa9f+Mu37kmfy8JcUVvWPt4cX7EuQWAjjHUjZqVl7nGSTRHRg==",
+      "type": "package",
+      "path": "google.protobuf/3.32.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "google.protobuf.3.32.0.nupkg.sha512",
+        "google.protobuf.nuspec",
+        "lib/net45/Google.Protobuf.dll",
+        "lib/net45/Google.Protobuf.pdb",
+        "lib/net5.0/Google.Protobuf.dll",
+        "lib/net5.0/Google.Protobuf.pdb",
+        "lib/netstandard1.1/Google.Protobuf.dll",
+        "lib/netstandard1.1/Google.Protobuf.pdb",
+        "lib/netstandard2.0/Google.Protobuf.dll",
+        "lib/netstandard2.0/Google.Protobuf.pdb"
+      ]
+    },
+    "K4os.Compression.LZ4/1.3.8": {
+      "sha512": "LhwlPa7c1zs1OV2XadMtAWdImjLIsqFJPoRcIWAadSRn0Ri1DepK65UbWLPmt4riLqx2d40xjXRk0ogpqNtK7g==",
+      "type": "package",
+      "path": "k4os.compression.lz4/1.3.8",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "k4os.compression.lz4.1.3.8.nupkg.sha512",
+        "k4os.compression.lz4.nuspec",
+        "lib/net462/K4os.Compression.LZ4.dll",
+        "lib/net5.0/K4os.Compression.LZ4.dll",
+        "lib/net6.0/K4os.Compression.LZ4.dll",
+        "lib/netstandard2.0/K4os.Compression.LZ4.dll",
+        "lib/netstandard2.1/K4os.Compression.LZ4.dll"
+      ]
+    },
+    "K4os.Compression.LZ4.Streams/1.3.8": {
+      "sha512": "P15qr8dZAeo9GvYbUIPEYFQ0MEJ0i5iqr37wsYeRC3la2uCldOoeCa6to0CZ1taiwxIV+Mk8NGuZi+4iWivK9w==",
+      "type": "package",
+      "path": "k4os.compression.lz4.streams/1.3.8",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "k4os.compression.lz4.streams.1.3.8.nupkg.sha512",
+        "k4os.compression.lz4.streams.nuspec",
+        "lib/net462/K4os.Compression.LZ4.Streams.dll",
+        "lib/net5.0/K4os.Compression.LZ4.Streams.dll",
+        "lib/net6.0/K4os.Compression.LZ4.Streams.dll",
+        "lib/netstandard2.0/K4os.Compression.LZ4.Streams.dll",
+        "lib/netstandard2.1/K4os.Compression.LZ4.Streams.dll"
+      ]
+    },
+    "K4os.Hash.xxHash/1.0.8": {
+      "sha512": "Wp2F7BamQ2Q/7Hk834nV9vRQapgcr8kgv9Jvfm8J3D0IhDqZMMl+a2yxUq5ltJitvXvQfB8W6K4F4fCbw/P6YQ==",
+      "type": "package",
+      "path": "k4os.hash.xxhash/1.0.8",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "k4os.hash.xxhash.1.0.8.nupkg.sha512",
+        "k4os.hash.xxhash.nuspec",
+        "lib/net462/K4os.Hash.xxHash.dll",
+        "lib/net5.0/K4os.Hash.xxHash.dll",
+        "lib/net6.0/K4os.Hash.xxHash.dll",
+        "lib/netstandard2.0/K4os.Hash.xxHash.dll",
+        "lib/netstandard2.1/K4os.Hash.xxHash.dll"
       ]
     },
     "Microsoft.AspNetCore.Authentication.JwtBearer/8.0.0": {
@@ -811,14 +1089,41 @@
         "microsoft.openapi.nuspec"
       ]
     },
-    "MySqlConnector/2.4.0": {
-      "sha512": "78M+gVOjbdZEDIyXQqcA7EYlCGS3tpbUELHvn6638A2w0pkPI625ixnzsa5staAd3N9/xFmPJtkKDYwsXpFi/w==",
+    "MySql.Data/9.5.0": {
+      "sha512": "pbIrDv7vuvMlok6ldjliFOeb5fpGofAInUhG/8LraQBqT2a2xZTcAVjm/GyfZ9ZyjZeHJLWuMRbe0uI98sCoWg==",
       "type": "package",
-      "path": "mysqlconnector/2.4.0",
+      "path": "mysql.data/9.5.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "README",
+        "README.md",
+        "lib/net462/MySql.Data.dll",
+        "lib/net48/MySql.Data.dll",
+        "lib/net8.0/MySql.Data.dll",
+        "lib/net9.0/MySql.Data.dll",
+        "lib/netstandard2.0/MySql.Data.dll",
+        "lib/netstandard2.1/MySql.Data.dll",
+        "logo-mysql-170x115.png",
+        "mysql.data.9.5.0.nupkg.sha512",
+        "mysql.data.nuspec",
+        "runtimes/win-x64/native/comerr64.dll",
+        "runtimes/win-x64/native/gssapi64.dll",
+        "runtimes/win-x64/native/k5sprt64.dll",
+        "runtimes/win-x64/native/krb5_64.dll",
+        "runtimes/win-x64/native/krbcc64.dll"
+      ]
+    },
+    "MySqlConnector/2.5.0": {
+      "sha512": "hoAwfHHF8DlRRqwHOhN3u1KLi+XbX/4LPS7Anfa+SYC97vRyIfdEOEEfj1L50q01Ik8aDNvmDrNmu/VPFiAiaQ==",
+      "type": "package",
+      "path": "mysqlconnector/2.5.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "README.md",
+        "lib/net10.0/MySqlConnector.dll",
         "lib/net462/MySqlConnector.dll",
         "lib/net471/MySqlConnector.dll",
         "lib/net48/MySqlConnector.dll",
@@ -828,7 +1133,7 @@
         "lib/netstandard2.0/MySqlConnector.dll",
         "lib/netstandard2.1/MySqlConnector.dll",
         "logo.png",
-        "mysqlconnector.2.4.0.nupkg.sha512",
+        "mysqlconnector.2.5.0.nupkg.sha512",
         "mysqlconnector.nuspec"
       ]
     },
@@ -916,6 +1221,65 @@
         "swashbuckle.aspnetcore.swaggerui.nuspec"
       ]
     },
+    "System.Configuration.ConfigurationManager/8.0.0": {
+      "sha512": "JlYi9XVvIREURRUlGMr1F6vOFLk7YSY4p1vHo4kX3tQ0AGrjqlRWHDi66ImHhy6qwXBG3BJ6Y1QlYQ+Qz6Xgww==",
+      "type": "package",
+      "path": "system.configuration.configurationmanager/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Configuration.ConfigurationManager.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Configuration.ConfigurationManager.targets",
+        "lib/net462/System.Configuration.ConfigurationManager.dll",
+        "lib/net6.0/System.Configuration.ConfigurationManager.dll",
+        "lib/net7.0/System.Configuration.ConfigurationManager.dll",
+        "lib/net8.0/System.Configuration.ConfigurationManager.dll",
+        "lib/netstandard2.0/System.Configuration.ConfigurationManager.dll",
+        "system.configuration.configurationmanager.8.0.0.nupkg.sha512",
+        "system.configuration.configurationmanager.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "System.Diagnostics.EventLog/8.0.0": {
+      "sha512": "fdYxcRjQqTTacKId/2IECojlDSFvp7LP5N78+0z/xH7v/Tuw5ZAxu23Y6PTCRinqyu2ePx+Gn1098NC6jM6d+A==",
+      "type": "package",
+      "path": "system.diagnostics.eventlog/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Diagnostics.EventLog.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Diagnostics.EventLog.targets",
+        "lib/net462/System.Diagnostics.EventLog.dll",
+        "lib/net6.0/System.Diagnostics.EventLog.dll",
+        "lib/net7.0/System.Diagnostics.EventLog.dll",
+        "lib/net8.0/System.Diagnostics.EventLog.dll",
+        "lib/netstandard2.0/System.Diagnostics.EventLog.dll",
+        "runtimes/win/lib/net6.0/System.Diagnostics.EventLog.Messages.dll",
+        "runtimes/win/lib/net6.0/System.Diagnostics.EventLog.dll",
+        "runtimes/win/lib/net6.0/System.Diagnostics.EventLog.xml",
+        "runtimes/win/lib/net7.0/System.Diagnostics.EventLog.Messages.dll",
+        "runtimes/win/lib/net7.0/System.Diagnostics.EventLog.dll",
+        "runtimes/win/lib/net7.0/System.Diagnostics.EventLog.xml",
+        "runtimes/win/lib/net8.0/System.Diagnostics.EventLog.Messages.dll",
+        "runtimes/win/lib/net8.0/System.Diagnostics.EventLog.dll",
+        "runtimes/win/lib/net8.0/System.Diagnostics.EventLog.xml",
+        "system.diagnostics.eventlog.8.0.0.nupkg.sha512",
+        "system.diagnostics.eventlog.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
     "System.IdentityModel.Tokens.Jwt/8.0.0": {
       "sha512": "K0dNZoXiedkpkz8v8xj3jH5IeSa3iAPNu2OegePynCeG6wiLx7CvBfDa90hYOBJ58Y21tZFd9RLpzfS7rEaHlQ==",
       "type": "package",
@@ -938,15 +1302,136 @@
         "system.identitymodel.tokens.jwt.8.0.0.nupkg.sha512",
         "system.identitymodel.tokens.jwt.nuspec"
       ]
+    },
+    "System.IO.Pipelines/6.0.3": {
+      "sha512": "ryTgF+iFkpGZY1vRQhfCzX0xTdlV3pyaTTqRu2ETbEv+HlV7O6y7hyQURnghNIXvctl5DuZ//Dpks6HdL/Txgw==",
+      "type": "package",
+      "path": "system.io.pipelines/6.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/netcoreapp2.0/System.IO.Pipelines.targets",
+        "buildTransitive/netcoreapp3.1/_._",
+        "lib/net461/System.IO.Pipelines.dll",
+        "lib/net6.0/System.IO.Pipelines.dll",
+        "lib/netcoreapp3.1/System.IO.Pipelines.dll",
+        "lib/netstandard2.0/System.IO.Pipelines.dll",
+        "system.io.pipelines.6.0.3.nupkg.sha512",
+        "system.io.pipelines.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "System.Security.Cryptography.ProtectedData/8.0.0": {
+      "sha512": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg==",
+      "type": "package",
+      "path": "system.security.cryptography.protecteddata/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Security.Cryptography.ProtectedData.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Security.Cryptography.ProtectedData.targets",
+        "lib/MonoAndroid10/_._",
+        "lib/MonoTouch10/_._",
+        "lib/net462/System.Security.Cryptography.ProtectedData.dll",
+        "lib/net6.0/System.Security.Cryptography.ProtectedData.dll",
+        "lib/net7.0/System.Security.Cryptography.ProtectedData.dll",
+        "lib/net8.0/System.Security.Cryptography.ProtectedData.dll",
+        "lib/netstandard2.0/System.Security.Cryptography.ProtectedData.dll",
+        "lib/xamarinios10/_._",
+        "lib/xamarinmac20/_._",
+        "lib/xamarintvos10/_._",
+        "lib/xamarinwatchos10/_._",
+        "system.security.cryptography.protecteddata.8.0.0.nupkg.sha512",
+        "system.security.cryptography.protecteddata.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "System.Security.Permissions/8.0.0": {
+      "sha512": "v/BBylw7XevuAsHXoX9dDUUfmBIcUf7Lkz8K3ZXIKz3YRKpw8YftpSir4n4e/jDTKFoaK37AsC3xnk+GNFI1Ow==",
+      "type": "package",
+      "path": "system.security.permissions/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Security.Permissions.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Security.Permissions.targets",
+        "lib/net462/System.Security.Permissions.dll",
+        "lib/net6.0/System.Security.Permissions.dll",
+        "lib/net7.0/System.Security.Permissions.dll",
+        "lib/net8.0/System.Security.Permissions.dll",
+        "lib/netstandard2.0/System.Security.Permissions.dll",
+        "system.security.permissions.8.0.0.nupkg.sha512",
+        "system.security.permissions.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "System.Windows.Extensions/8.0.0": {
+      "sha512": "Obg3a90MkOw9mYKxrardLpY2u0axDMrSmy4JCdq2cYbelM2cUwmUir5Bomvd1yxmPL9h5LVHU1tuKBZpUjfASg==",
+      "type": "package",
+      "path": "system.windows.extensions/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "lib/net6.0/System.Windows.Extensions.dll",
+        "lib/net7.0/System.Windows.Extensions.dll",
+        "lib/net8.0/System.Windows.Extensions.dll",
+        "runtimes/win/lib/net6.0/System.Windows.Extensions.dll",
+        "runtimes/win/lib/net6.0/System.Windows.Extensions.xml",
+        "runtimes/win/lib/net7.0/System.Windows.Extensions.dll",
+        "runtimes/win/lib/net7.0/System.Windows.Extensions.xml",
+        "runtimes/win/lib/net8.0/System.Windows.Extensions.dll",
+        "runtimes/win/lib/net8.0/System.Windows.Extensions.xml",
+        "system.windows.extensions.8.0.0.nupkg.sha512",
+        "system.windows.extensions.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "ZstdSharp.Port/0.8.6": {
+      "sha512": "iP4jVLQoQmUjMU88g1WObiNr6YKZGvh4aOXn3yOJsHqZsflwRsxZPcIBvNXgjXO3vQKSLctXGLTpcBPLnWPS8A==",
+      "type": "package",
+      "path": "zstdsharp.port/0.8.6",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net462/ZstdSharp.dll",
+        "lib/net5.0/ZstdSharp.dll",
+        "lib/net6.0/ZstdSharp.dll",
+        "lib/net7.0/ZstdSharp.dll",
+        "lib/net8.0/ZstdSharp.dll",
+        "lib/net9.0/ZstdSharp.dll",
+        "lib/netcoreapp3.1/ZstdSharp.dll",
+        "lib/netstandard2.0/ZstdSharp.dll",
+        "lib/netstandard2.1/ZstdSharp.dll",
+        "zstdsharp.port.0.8.6.nupkg.sha512",
+        "zstdsharp.port.nuspec"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
       "BCrypt.Net-Next >= 4.0.2",
-      "Dapper >= 2.1.0",
+      "Dapper >= 2.1.66",
       "Microsoft.AspNetCore.Authentication.JwtBearer >= 8.0.0",
       "Microsoft.IdentityModel.Tokens >= 8.0.0",
-      "MySqlConnector >= 2.4.0",
+      "MySql.Data >= 9.5.0",
+      "MySqlConnector >= 2.5.0",
       "Swashbuckle.AspNetCore >= 6.8.0",
       "System.IdentityModel.Tokens.Jwt >= 8.0.0"
     ]
@@ -999,7 +1484,7 @@
           },
           "Dapper": {
             "target": "Package",
-            "version": "[2.1.0, )"
+            "version": "[2.1.66, )"
           },
           "Microsoft.AspNetCore.Authentication.JwtBearer": {
             "target": "Package",
@@ -1009,9 +1494,13 @@
             "target": "Package",
             "version": "[8.0.0, )"
           },
+          "MySql.Data": {
+            "target": "Package",
+            "version": "[9.5.0, )"
+          },
           "MySqlConnector": {
             "target": "Package",
-            "version": "[2.4.0, )"
+            "version": "[2.5.0, )"
           },
           "Swashbuckle.AspNetCore": {
             "target": "Package",
@@ -1044,17 +1533,5 @@
         "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.415/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "TrampayBackend depende de Dapper (>= 2.1.0), mas Dapper 2.1.0 não foi encontrado. A melhor correspondência aproximada de Dapper 2.1.1 foi resolvida.",
-      "libraryId": "Dapper",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  }
 }

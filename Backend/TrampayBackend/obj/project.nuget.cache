@@ -1,11 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "gf+5dxZfI0o=",
+  "dgSpecHash": "pxswaZ+gH0I=",
   "success": true,
   "projectFilePath": "/workspaces/Trampay/Backend/TrampayBackend/TrampayBackend.csproj",
   "expectedPackageFiles": [
     "/home/codespace/.nuget/packages/bcrypt.net-next/4.0.2/bcrypt.net-next.4.0.2.nupkg.sha512",
-    "/home/codespace/.nuget/packages/dapper/2.1.1/dapper.2.1.1.nupkg.sha512",
+    "/home/codespace/.nuget/packages/bouncycastle.cryptography/2.6.2/bouncycastle.cryptography.2.6.2.nupkg.sha512",
+    "/home/codespace/.nuget/packages/dapper/2.1.66/dapper.2.1.66.nupkg.sha512",
+    "/home/codespace/.nuget/packages/google.protobuf/3.32.0/google.protobuf.3.32.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/k4os.compression.lz4/1.3.8/k4os.compression.lz4.1.3.8.nupkg.sha512",
+    "/home/codespace/.nuget/packages/k4os.compression.lz4.streams/1.3.8/k4os.compression.lz4.streams.1.3.8.nupkg.sha512",
+    "/home/codespace/.nuget/packages/k4os.hash.xxhash/1.0.8/k4os.hash.xxhash.1.0.8.nupkg.sha512",
     "/home/codespace/.nuget/packages/microsoft.aspnetcore.authentication.jwtbearer/8.0.0/microsoft.aspnetcore.authentication.jwtbearer.8.0.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/microsoft.extensions.apidescription.server/6.0.5/microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
     "/home/codespace/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.2/microsoft.extensions.dependencyinjection.abstractions.8.0.2.nupkg.sha512",
@@ -17,23 +22,20 @@
     "/home/codespace/.nuget/packages/microsoft.identitymodel.protocols.openidconnect/7.0.3/microsoft.identitymodel.protocols.openidconnect.7.0.3.nupkg.sha512",
     "/home/codespace/.nuget/packages/microsoft.identitymodel.tokens/8.0.0/microsoft.identitymodel.tokens.8.0.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/microsoft.openapi/1.6.14/microsoft.openapi.1.6.14.nupkg.sha512",
-    "/home/codespace/.nuget/packages/mysqlconnector/2.4.0/mysqlconnector.2.4.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/mysql.data/9.5.0/mysql.data.9.5.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/mysqlconnector/2.5.0/mysqlconnector.2.5.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/swashbuckle.aspnetcore/6.8.0/swashbuckle.aspnetcore.6.8.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/swashbuckle.aspnetcore.swagger/6.8.0/swashbuckle.aspnetcore.swagger.6.8.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/swashbuckle.aspnetcore.swaggergen/6.8.0/swashbuckle.aspnetcore.swaggergen.6.8.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/swashbuckle.aspnetcore.swaggerui/6.8.0/swashbuckle.aspnetcore.swaggerui.6.8.0.nupkg.sha512",
-    "/home/codespace/.nuget/packages/system.identitymodel.tokens.jwt/8.0.0/system.identitymodel.tokens.jwt.8.0.0.nupkg.sha512"
+    "/home/codespace/.nuget/packages/system.configuration.configurationmanager/8.0.0/system.configuration.configurationmanager.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.diagnostics.eventlog/8.0.0/system.diagnostics.eventlog.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.identitymodel.tokens.jwt/8.0.0/system.identitymodel.tokens.jwt.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.io.pipelines/6.0.3/system.io.pipelines.6.0.3.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.security.cryptography.protecteddata/8.0.0/system.security.cryptography.protecteddata.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.security.permissions/8.0.0/system.security.permissions.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/system.windows.extensions/8.0.0/system.windows.extensions.8.0.0.nupkg.sha512",
+    "/home/codespace/.nuget/packages/zstdsharp.port/0.8.6/zstdsharp.port.0.8.6.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "TrampayBackend depende de Dapper (>= 2.1.0), mas Dapper 2.1.0 não foi encontrado. A melhor correspondência aproximada de Dapper 2.1.1 foi resolvida.",
-      "libraryId": "Dapper",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  "logs": []
 }
