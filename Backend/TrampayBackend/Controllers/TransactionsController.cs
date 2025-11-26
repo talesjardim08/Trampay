@@ -1,4 +1,3 @@
-// Backend/TrampayBackend/Controllers/TransactionsController.cs
 using System;
 using System.Data;
 using Dapper;
@@ -51,7 +50,6 @@ namespace TrampayBackend.Controllers
         // ---------------------------------------------------------------------
         // CALCULAR SALDO
         // ---------------------------------------------------------------------
-
         [HttpGet("calculate-balance")]
         [Authorize]
         public async Task<IActionResult> CalculateBalance()
@@ -61,12 +59,10 @@ namespace TrampayBackend.Controllers
 
             var sql = @"
                 SELECT 
-                    COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as TotalIncome,
-                    COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as TotalExpenses
+                    COALESCE(SUM(CASE WHEN type = 'income' AND status = 'concluído' THEN amount ELSE 0 END), 0) as TotalIncome,
+                    COALESCE(SUM(CASE WHEN type = 'expense' AND status = 'concluído' THEN ABS(amount) ELSE 0 END), 0) as TotalExpenses
                 FROM transactions
-                WHERE owner_user_id = @UserId 
-                AND currency = 'BRL' 
-                AND status = 'concluído'";
+                WHERE owner_user_id = @UserId AND currency = 'BRL'";
 
             var result = await _db.QueryFirstOrDefaultAsync<dynamic>(sql, new { UserId = userId });
 
@@ -101,9 +97,8 @@ namespace TrampayBackend.Controllers
         }
 
         // ---------------------------------------------------------------------
-        // LISTAR TRANSAÇÕES
+        // LISTAR TRANSAÇÕES - CORRIGIDO: Usa 'title' e 'notes' ao invés de 'description'
         // ---------------------------------------------------------------------
-
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> List([FromQuery] string? type, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
@@ -113,8 +108,8 @@ namespace TrampayBackend.Controllers
 
             await EnsureTransactionSchema();
 
-            var sql = @"SELECT id, owner_user_id, account_id, title, description, type, amount, category, 
-                               currency, transaction_date, status, metadata, created_at, updated_at 
+            var sql = @"SELECT id, owner_user_id, account_id, title, notes, type, amount, category, 
+                               currency, transaction_date, status, created_at, updated_at 
                         FROM transactions 
                         WHERE owner_user_id = @UserId
                         AND (@Type IS NULL OR type = @Type)
@@ -123,13 +118,31 @@ namespace TrampayBackend.Controllers
                         ORDER BY transaction_date DESC, created_at DESC";
 
             var rows = await _db.QueryAsync(sql, new { UserId = userId, Type = type, From = from, To = to });
-            return Ok(rows);
+            
+            // Mapear para formato esperado pelo frontend
+            var mapped = rows.Select(r => new
+            {
+                id = r.id,
+                owner_user_id = r.owner_user_id,
+                account_id = r.account_id,
+                title = r.title,
+                description = r.notes ?? r.title, // CORREÇÃO: mapeia notes para description
+                type = r.type,
+                amount = r.amount,
+                category = r.category,
+                currency = r.currency,
+                transaction_date = r.transaction_date,
+                status = r.status,
+                created_at = r.created_at,
+                updated_at = r.updated_at
+            });
+
+            return Ok(mapped);
         }
 
         // ---------------------------------------------------------------------
-        // CRIAR TRANSAÇÃO
+        // CRIAR TRANSAÇÃO - CORRIGIDO: Sinais corretos e mapeamento de campos
         // ---------------------------------------------------------------------
-
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> Create([FromBody] CreateTransactionDto dto)
@@ -139,10 +152,19 @@ namespace TrampayBackend.Controllers
 
             await EnsureTransactionSchema();
 
-            var sql = @"INSERT INTO transactions (owner_user_id, account_id, title, description, type, amount, 
-                                              category, currency, transaction_date, status, metadata, created_at)
-                        VALUES (@Owner, @Account, @Title, @Description, @Type, @Amount, @Category, @Currency, 
-                                @Date, @Status, @Metadata, NOW());
+            // CORREÇÃO CRÍTICA: Garantir sinais corretos
+            decimal amount = Math.Abs(dto.Amount); // Sempre trabalhar com valor absoluto
+            
+            // Income = positivo, Expense = negativo no banco
+            if (dto.Type == "expense")
+            {
+                amount = -amount;
+            }
+
+            var sql = @"INSERT INTO transactions (owner_user_id, account_id, title, notes, type, amount, 
+                                              category, currency, transaction_date, status, created_at)
+                        VALUES (@Owner, @Account, @Title, @Notes, @Type, @Amount, @Category, @Currency, 
+                                @Date, @Status, NOW());
                         SELECT LAST_INSERT_ID();";
 
             var id = await _db.ExecuteScalarAsync<long>(sql, new
@@ -150,20 +172,19 @@ namespace TrampayBackend.Controllers
                 Owner = userId,
                 Account = dto.AccountId,
                 Title = dto.Title ?? dto.Description ?? "Transação",
-                Description = dto.Description ?? dto.Title ?? "Transação",
+                Notes = dto.Description ?? dto.Title ?? "", // CORREÇÃO: mapeia description para notes
                 Type = dto.Type,
-                Amount = dto.Amount,
+                Amount = amount, // Usa o amount já com sinal correto
                 Category = dto.Category ?? "Outros",
                 Currency = dto.Currency ?? "BRL",
                 Date = dto.TransactionDate?.Date ?? DateTime.UtcNow.Date,
-                Status = "concluído",
-                Metadata = dto.Metadata
+                Status = "concluído"
             });
 
-            // AJUSTAR SALDO
+            // AJUSTAR SALDO - CORREÇÃO: Usa valor absoluto para cálculo
             if ((dto.Currency ?? "BRL") == "BRL")
             {
-                var adjustmentAmount = dto.Type == "income" ? dto.Amount : -dto.Amount;
+                var adjustmentAmount = dto.Type == "income" ? Math.Abs(dto.Amount) : -Math.Abs(dto.Amount);
 
                 await _db.ExecuteAsync(@"
                     CREATE TABLE IF NOT EXISTS user_balance (
@@ -191,13 +212,31 @@ namespace TrampayBackend.Controllers
             }
 
             var row = await _db.QueryFirstOrDefaultAsync("SELECT * FROM transactions WHERE id = @Id", new { Id = id });
-            return Created($"/api/transactions/{id}", row);
+            
+            // Mapear resposta para formato esperado pelo frontend
+            var response = new
+            {
+                id = row.id,
+                owner_user_id = row.owner_user_id,
+                account_id = row.account_id,
+                title = row.title,
+                description = row.notes ?? row.title, // CORREÇÃO
+                type = row.type,
+                amount = row.amount,
+                category = row.category,
+                currency = row.currency,
+                transaction_date = row.transaction_date,
+                status = row.status,
+                created_at = row.created_at,
+                updated_at = row.updated_at
+            };
+
+            return Created($"/api/transactions/{id}", response);
         }
 
         // ---------------------------------------------------------------------
         // OBTER TRANSAÇÃO POR ID
         // ---------------------------------------------------------------------
-
         [HttpGet("{id:long}")]
         [Authorize]
         public async Task<IActionResult> GetById(long id)
@@ -210,13 +249,30 @@ namespace TrampayBackend.Controllers
 
             if (transaction == null) return NotFound();
 
-            return Ok(transaction);
+            // Mapear para formato esperado
+            var response = new
+            {
+                id = transaction.id,
+                owner_user_id = transaction.owner_user_id,
+                account_id = transaction.account_id,
+                title = transaction.title,
+                description = transaction.notes ?? transaction.title,
+                type = transaction.type,
+                amount = transaction.amount,
+                category = transaction.category,
+                currency = transaction.currency,
+                transaction_date = transaction.transaction_date,
+                status = transaction.status,
+                created_at = transaction.created_at,
+                updated_at = transaction.updated_at
+            };
+
+            return Ok(response);
         }
 
         // ---------------------------------------------------------------------
         // DELETAR TRANSAÇÃO
         // ---------------------------------------------------------------------
-
         [HttpDelete("{id:long}")]
         [Authorize]
         public async Task<IActionResult> Delete(long id)
@@ -236,7 +292,8 @@ namespace TrampayBackend.Controllers
 
             if (transaction.currency == "BRL" && transaction.status == "concluído")
             {
-                var adjustmentAmount = transaction.type == "income" ? -transaction.amount : transaction.amount;
+                // CORREÇÃO: Reverter ajuste de saldo corretamente
+                var adjustmentAmount = transaction.type == "income" ? -Math.Abs((decimal)transaction.amount) : Math.Abs((decimal)transaction.amount);
 
                 await _db.ExecuteAsync(@"
                     UPDATE user_balance 
@@ -250,9 +307,8 @@ namespace TrampayBackend.Controllers
         }
 
         // ---------------------------------------------------------------------
-        // DTO
+        // DTO - CORRIGIDO
         // ---------------------------------------------------------------------
-
         public record CreateTransactionDto(
             long? AccountId,
             string? Title,
