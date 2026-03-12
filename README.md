@@ -1,7 +1,7 @@
 # 📱 Trampay Pasta aberta com descritivo e vídeos na prática do aplicativo: https://drive.google.com/drive/folders/1hFeKlDaRCE_G8nSijMJtmlG3I4uFGH9U?usp=sharing
 
 > **TCC da Etec de Taboão da Serra – Técnico em Desenvolvimento de Sistemas Integrado ao Ensino Médio**  
-> **Orientação:** Prof.ª Nathane Castro
+
 
 ---
 
@@ -41,21 +41,6 @@ O Trampay foi pensado para ser **intuitivo e seguro**, utilizando **API.NET C# p
 
 ---
 
-## 👥 Integrantes
-
-| Integrantes |
-|-------------|
-| **João Victor Queiroz** |
-| **Maria Fernanda** |
-| **Matheus Quaresma** |
-| **Sophia Marques** |
-| **Tales de Souza Jardim** |
-
----
-
-**Orientação:** Prof.ª **Nathane Castro** – Etec de Taboão da Serra  
-
----
 
 Feito com carinho pela equipe do **Trampay**.
  https://drive.google.com/drive/folders/1hFeKlDaRCE_G8nSijMJtmlG3I4uFGH9U?usp=sharing - acesse e veja na prática
